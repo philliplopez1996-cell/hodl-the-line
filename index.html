@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.6)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.7)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -181,7 +181,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.6',
+  build: '0.15.7',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -235,8 +235,8 @@ const CONFIG = {
       speed: 80,           // px/s along the path
       // v0.15.2: scale from the painted rail gauge. gauge = rail centre-to-centre px along the (horizontal) ties at each path point,
       // measured on the 1920 map (previews/train-tunnel-v2/measure_gauge.py): y 128/160 = mouth trend (rails black inside),
-      // y 180-241 measured, y 272+ = far trend (the far rail leaves the map at x 960), held. v0.15.6: scale = art.sizeK * gauge / art.gaugeRef
-      gauge: [29.4, 31.7, 33.2, 36.0, 44.2, 51.8, 62.1, 62.1, 62.1, 62.1], // -> lead ~33 px wide at the mouth, ~68 px at the screen edge
+      // y 180-241 measured, y 272+ = far trend (the far rail leaves the map at x 960), held. v0.15.7: scale from the wheels (art.wheels, art.wheelGaugeFit)
+      gauge: [29.4, 31.7, 33.2, 36.0, 44.2, 51.8, 62.1, 62.1, 62.1, 62.1],
       mouthY: 170,         // tunnel floor line (signal nose-out / tail-out)
       cars: 3,             // v0.15.6: cars per train (1-3: lead, cargo1, cargo2; Canvas's cargo3 is not embedded, file size)
       art: {               // v0.15.6: Canvas minecart-v2 final-A (assets/ambient/minecart-A/spec.md, cars.json). No tint, no rotation, no bob
@@ -244,10 +244,22 @@ const CONFIG = {
         cell: [63, 75],    // 1x atlas cell (2x: 126x150); row = car (order), column = front, q34, front shadow, q34 shadow, image at the cell's top-left
         order: ['lead', 'cargo1', 'cargo2'],
         size: [[63, 75], [60, 71], [60, 69]],               // 1x canvas size per car (same for its 4 images)
-        anchor: [[31.5, 60.5], [28.5, 62], [28.5, 60.5]],   // 1x anchor per car = silhouette centre x, front-axle rail-contact y (same in all 4 images) -> on the path point
-        gaugeRef: 39.15,   // 1x art px between the rails at the front axle (78.3 at 2x), both poses
-        sizeK: 0.9,        // car gauge = sizeK x the painted rail gauge (1x sprite scale = sizeK * gauge / gaugeRef; 2x atlas: / 2)
-        spaceK: 1.1,       // front axle to front axle = spaceK x the local gauge (gauge at the gap midpoint)
+        // v0.15.7 (Phill: "the wheels don't match the width of the train tracks"): size and place each car and pose by its WHEELS.
+        // wheels = rail-contact points in 1x art px (= 2x / 2), measured on the 2x sprites (tools/measure-wheels.py, alpha >= 128):
+        //   front: [left x, right x, y] = tread centres at the bottom of the two edge-on front wheels;
+        //   q34:   [near x, near y, far x, far y] = lowest point of the near front wheel / of the far front wheel's arc under the far
+        //          front corner (the lead's far wheel is hidden by its cowcatcher: estimated from the carts' axle, Canvas's refit ratio).
+        wheels: [{ front: [11.5, 51.5, 61], q34: [29.75, 63.5, 46.0, 54.25] },   // lead (q34 far wheel estimated)
+                 { front: [8.5, 48.5, 62.5], q34: [26.5, 62.5, 44.75, 53.5] },   // cargo1
+                 { front: [8.75, 48.5, 61], q34: [26.5, 61, 44.6, 51.5] }],      // cargo2
+        wheelGaugeFit: 1.0, // wheel contact span = wheelGaugeFit x the local painted rail gauge (rail centre to rail centre, along the ties)
+                           // front: scale = fit * gauge / (right - left), origin = wheel-pair midpoint (on the path point)
+                           // q34: scale = fit * gauge / (ax + ay * tan(heading)) (front axle across / up), origin = axle midpoint
+        q34Match: 1,       // 1 = q34 front axle spans both rails; 0 = q34 drawn at the front pose's scale (wheel pair only centred)
+        q34RampPx: 40,     // after the crossfade the q34 scale and origin move from the front pose's to the fitted ones over this much path (0.5 s)
+        q34MaxDeg: 70,     // heading cap in the q34 fit
+        spaceK: 1.1,       // front axle to front axle = spaceK x the local gauge (gauge at the gap midpoint) while the car ahead is head-on
+        spaceQ34K: 1.25,   // ... and once the car ahead has turned (q34, after its ramp; the fitted q34 cars are bigger, 1.1 overlapped ~1/4 car)
         switchDeg: 25,     // pose per car: front until it passes the first path point below mouthY heading >= switchDeg right of straight down, then q34
         xfadePx: 8,        // pose crossfade length along the path (8 px = 0.1 s at speed 80, 3 frames at 30 fps; as in the preview)
         shadowFromY: 158, shadowFadePx: 12, shadowAlpha: 1, // shadow off while the car is inside the tunnel (y < 158, cover opaque), full from y 170
@@ -2412,6 +2424,11 @@ class Level extends Phaser.Scene {
     const N = pts.length / 2, xs = new Float32Array(N), ys = new Float32Array(N), cum = new Float32Array(N), gg = new Float32Array(N), G = T.gauge;
     for (let i = 0; i < N; i++) { xs[i] = pts[2 * i]; ys[i] = pts[2 * i + 1]; if (i) cum[i] = cum[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]); }
     for (let i = 0; i < N; i++) { const j = Math.min(Math.floor(i / n), P.length - 2), u = Math.min(1, i / n - j); gg[i] = G[j] + (G[j + 1] - G[j]) * u; } // rail gauge per sample (1x px)
+    const tn = new Float32Array(N), cap = R.q34MaxDeg * Math.PI / 180; // v0.15.7: tan(heading right of straight down) per sample (mean of its two spans), 0..cap
+    for (let i = 0; i < N; i++) {
+      const a = Math.max(0, i - 1), b = Math.min(N - 1, i + 1), h = Math.atan2(xs[b] - xs[a], ys[b] - ys[a]);
+      tn[i] = Math.tan(Math.min(cap, Math.max(0, h)));
+    }
     let dSw = cum[N - 1]; // v0.15.6 pose switch: first point below the tunnel floor where the rails head >= switchDeg right of straight down
     for (let i = 0; i < N - 1; i++) {
       if (ys[i + 1] <= T.mouthY || Math.atan2(xs[i + 1] - xs[i], ys[i + 1] - ys[i]) * 180 / Math.PI < R.switchDeg) continue;
@@ -2419,25 +2436,30 @@ class Level extends Phaser.Scene {
     }
     const cars = [];
     for (let i = 0; i < nc; i++) {
-      const sz = R.size[i], an = R.anchor[i], k = nc - 1 - i, o = []; // k = 0: the back car (drawn first), nc - 1: the lead (on top)
+      const sz = R.size[i], W = R.wheels[i], k = nc - 1 - i, o = []; // k = 0: the back car (drawn first), nc - 1: the lead (on top)
+      const fo = [(W.front[0] + W.front[1]) / 2, W.front[2]], qm = [(W.q34[0] + W.q34[2]) / 2, (W.q34[1] + W.q34[3]) / 2]; // v0.15.7 origins (1x art px)
       for (let f = 0; f < 4; f++) { // 0 front, 1 q34, 2 front shadow, 3 q34 shadow
         const nm = 'mc' + tk + '_' + i + '_' + f; if (!tex.has(nm)) tex.add(nm, 0, f * R.cell[0] * tk, i * R.cell[1] * tk, sz[0] * tk, sz[1] * tk);
         const z = (f < 2 ? R.carZ : T.z) + R.zStep * k + (f & 1 ? R.zStep / 2 : 0); // q34 over front (crossfade), all shadows under all cars
-        o.push(img(id, 0, 0, an[0] / sz[0], an[1] / sz[1], z, nm).setVisible(false));
+        o.push(img(id, 0, 0, fo[0] / sz[0], fo[1] / sz[1], z, nm).setVisible(false)); // q34 origin is set per frame (ramp)
       }
-      cars.push({ o, i, ax: an[0], d: 0, x: 0, y: 0, g: 1, k: 1 });
+      cars.push({ o, i, sz, fo, qm, fs: W.front[1] - W.front[0], qx: W.q34[2] - W.q34[0], qy: W.q34[1] - W.q34[3],
+                  d: 0, x: 0, y: 0, g: 1, k: 1, tn: 0, kq: 1, w: 0, left: 0 });
     }
     const cover = img('tunnelFront', T.cover.at[0], T.cover.at[1], 0, 0, T.coverZ).setVisible(false);
-    return { T, R, xs, ys, cum, gg, len: cum[N - 1], dSw, tk, cars, cover, on: false, t0: 0, sig: -1, noseOut: false, tailOutAt: -1,
+    return { T, R, xs, ys, cum, gg, tn, len: cum[N - 1], dSw, tk, cars, cover, on: false, t0: 0, sig: -1, noseOut: false, tailOutAt: -1,
              periodK: lite ? T.litePeriodK : 1, next: rand(T.first[0], T.first[1]), sched: 0 };
   }
-  tunnelTrainPose(tt, d, c) { // car c at path distance d -> c.x / y (anchor point), g (rail gauge, 1x px), k (scale per 1x art px); no allocation
+  tunnelTrainPose(tt, d, c) { // car c at path distance d -> c.x / y (path point), g (rail gauge, 1x px), k / kq (front / q34 scale per 1x art px), w (q34 ramp); no allocation
     const cum = tt.cum, L = cum.length - 1;
     d = d < 0 ? 0 : d > tt.len ? tt.len : d;
     let lo = 0, hi = L; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] <= d) lo = m; else hi = m; }
     const u = (d - cum[lo]) / (cum[hi] - cum[lo] || 1e-6);
     c.x = tt.xs[lo] + (tt.xs[hi] - tt.xs[lo]) * u; c.y = tt.ys[lo] + (tt.ys[hi] - tt.ys[lo]) * u;
-    c.g = tt.gg[lo] + (tt.gg[hi] - tt.gg[lo]) * u; c.k = tt.R.sizeK * c.g / tt.R.gaugeRef;
+    const R = tt.R; c.g = tt.gg[lo] + (tt.gg[hi] - tt.gg[lo]) * u; c.tn = tt.tn[lo] + (tt.tn[hi] - tt.tn[lo]) * u;
+    c.k = R.wheelGaugeFit * c.g / c.fs; // v0.15.7: front wheel pair = fit x gauge
+    c.w = Math.min(1, Math.max(0, (d - tt.dSw - R.xfadePx) / R.q34RampPx)) * R.q34Match; // q34: front scale through the crossfade, then ramp to the fit
+    c.kq = c.k + (R.wheelGaugeFit * c.g / (c.qx + c.qy * c.tn) - c.k) * c.w;
   }
   tunnelTrainTick(tt, t, K) {
     const T = tt.T, R = tt.R, cars = tt.cars;
@@ -2449,20 +2471,23 @@ class Level extends Phaser.Scene {
     for (let i = 0; i < cars.length; i++) { // lead first; each next front axle spaceK x the gauge behind (gauge at the gap midpoint, one refine)
       const c = cars[i];
       if (!i) c.d = a * T.speed;
-      else { const p = cars[i - 1]; this.tunnelTrainPose(tt, p.d - R.spaceK * p.g, c); c.d = p.d - R.spaceK * (p.g + c.g) / 2; }
+      else { const p = cars[i - 1], sk = R.spaceK + (R.spaceQ34K - R.spaceK) * p.w; this.tunnelTrainPose(tt, p.d - sk * p.g, c); c.d = p.d - sk * (p.g + c.g) / 2; } // v0.15.7: spaceQ34K once the car ahead has turned
       this.tunnelTrainPose(tt, c.d, c);
       const m = Math.min(1, Math.max(0, (c.d - tt.dSw) / R.xfadePx)), fa = Math.min(1, 2 * (1 - m)), qa = Math.min(1, 2 * m); // never see-through mid-swap
-      const sh = Math.min(1, Math.max(0, (c.y - R.shadowFromY) / R.shadowFadePx)) * R.shadowAlpha, sc = c.k / tt.tk;
+      const sh = Math.min(1, Math.max(0, (c.y - R.shadowFromY) / R.shadowFadePx)) * R.shadowAlpha;
+      const ox = c.fo[0] + (c.qm[0] - c.fo[0]) * c.w, oy = c.fo[1] + (c.qm[1] - c.fo[1]) * c.w; // v0.15.7 q34 origin: front wheel midpoint -> axle midpoint
       for (let f = 0; f < 4; f++) {
-        const o = c.o[f], al = c.d > 0 ? (f & 1 ? qa : fa) * (f < 2 ? 1 : sh) : 0;
-        if (al > 0) o.setVisible(true).setPosition(c.x, c.y).setScale(sc).setAlpha(al); else if (o.visible) o.setVisible(false);
+        const o = c.o[f], q = f & 1, al = c.d > 0 ? (q ? qa : fa) * (f < 2 ? 1 : sh) : 0;
+        if (al > 0) { o.setVisible(true).setPosition(c.x, c.y).setScale((q ? c.kq : c.k) / tt.tk).setAlpha(al); if (q) o.setOrigin(ox / c.sz[0], oy / c.sz[1]); }
+        else if (o.visible) o.setVisible(false);
       }
+      c.left = c.x - Math.max(fa > 0 ? c.fo[0] * c.k : 0, qa > 0 ? ox * c.kq : 0); // drawn left edge of the car's canvas
     }
     const tail = cars[cars.length - 1];
     if (!tt.noseOut && cars[0].y >= T.mouthY) tt.noseOut = true;
     if (tt.tailOutAt < 0 && tail.y >= T.mouthY) tt.tailOutAt = a;
     tt.sig = !tt.noseOut ? T.signal.approachFrame : (tt.tailOutAt < 0 || a - tt.tailOutAt < T.signal.goHold) ? T.signal.goFrame : -1;
-    if (tail.x - tail.ax * tail.k > T.exitX + T.exitPad) { // gone (the tail car's whole canvas past the edge): hide, wait, loop
+    if (tail.left > T.exitX + T.exitPad) { // gone (the tail car's whole canvas past the edge): hide, wait, loop
       // v0.15.4: pause = max(0, period - runSec), runSec from the scheduled start -> starts (and so nose-outs) exactly periodSec apart (x2 in lite)
       tt.on = false; tt.sig = -1; tt.next = t + Math.max(0, T.periodSec * tt.periodK - (t - tt.sched)); tt.cover.setVisible(false);
       for (let i = 0; i < cars.length; i++) for (let f = 0; f < 4; f++) cars[i].o[f].setVisible(false);

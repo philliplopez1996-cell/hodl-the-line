@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-5 grey box (v0.14.2)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.0)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -149,7 +149,7 @@ window.HODL_ASSETS = {
 const CONFIG = {
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // !!! TURN OFF BEFORE SHIP: set dev.unlockAll to false for the real game.                        !!!
-  // !!! v0.10.1 TEST-ONLY switch for Phill's playtest builds. true = every built level (L1-L5) is   !!!
+  // !!! v0.10.1 TEST-ONLY switch for Phill's playtest builds. true = every built level (L1-L10) is   !!!
   // !!! open on Level Select from the start, and each level's hand has the Degens it expects even  !!!
   // !!! on a fresh save. It never writes fake clears into hodl.save, so false = the normal unlock  !!!
   // !!! flow from the real save (exactly v0.10). A 'DEV: all levels unlocked' tag shows on Menu    !!!
@@ -164,9 +164,11 @@ const CONFIG = {
     introFallbacks: [{ id: 'L2.intro.wallet', level: 3 },
       // v0.12: same idea for L4 / L5 (a jumped-ahead player never saw the Wallet / Firewall / Flash Loan intros)
       { id: 'L2.intro.wallet', level: 4 }, { id: 'L3.intro.firewall', level: 4 },
-      { id: 'L2.intro.wallet', level: 5 }, { id: 'L3.intro.firewall', level: 5 }, { id: 'L4.intro.flash', level: 5 }],
+      { id: 'L2.intro.wallet', level: 5 }, { id: 'L3.intro.firewall', level: 5 }, { id: 'L4.intro.flash', level: 5 },
+      // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
+      ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.14.2',
+  build: '0.15.0',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -257,7 +259,7 @@ const CONFIG = {
                  right: 16, top: 14, gap: 2, flagPop: 0.3, securedTime: 1.5,
                  waveFlagColor: 0xffa630 }, // v0.9: bigWaves flags (grey -> orange when the wave lands)
   shake: { duration: 0.25, intensity: 0.01 },
-  endScreen: { restartY: 450, guard: 0.5, retryX: 370, selectX: 590 }, // Retry/Replay + Level Select // Restart sits below the lane; clicks ignored for guard real seconds (Pixel W1)
+  endScreen: { restartY: 450, guard: 0.5, retryX: 370, selectX: 590, finaleMoreY: 370 }, // v0.15.0 finaleMoreY: L10 'More epochs' line // Retry/Replay + Level Select // Restart sits below the lane; clicks ignored for guard real seconds (Pixel W1)
 
   emptyLaneSpeedMult: 2,        // bots in a lane with zero defenders move this much faster ("rush")
   rushGate: 'afterDefenderLostOrBanner', // when rush is allowed: 'afterDefenderLostOrBanner' (a defender in that
@@ -334,6 +336,9 @@ const CONFIG = {
     // Rush x2 multiplies the current speed. label / dumpLabel = the grey-box body text.
     // v0.12.1 (Nova answer 1): colour shows state: candle green #3DDC84 while pumping, candle red #EF476F once dumped (damagedColor = the dump)
     pumpBot: { name: 'Pump Bot', hp: 200, damagedAt: 100, speed: 40, dumpSpeed: 15, bite: 40, width: 50, color: 0x3ddc84, damagedColor: 0xef476f, label: 'PUMP', dumpLabel: 'DUMP' },
+    // v0.15.0 (Nova l6-l10 plan 1 / launch-10-levels 2.4): Exit Liquidity Tank, L8+. knockback 0 = Blaster coins don't push it (per-bot, damageBot).
+    // colour TBD (Canvas): grey-box placeholder steel grey, darker once damaged. height = grey-box body height only (others 60; hits use width).
+    tankBot: { name: 'Exit Liquidity Tank', hp: 1000, damagedAt: 500, speed: 12, bite: 100, width: 70, height: 76, knockback: 0, color: 0x6c7a89, damagedColor: 0x3d4652, label: 'TANK', damagedLabel: 'TANK*' },
   },
 
   levels: {
@@ -498,9 +503,230 @@ const CONFIG = {
         { t: 174,   count: 1, type: 'pumpBot',     lane: 4 },
         { t: 180,   count: 1, type: 'firewallBot', lane: 2 },
         { t: 184,   count: 1, type: 'pumpBot',     lane: 1 },
-        { t: 185.5, count: 1, type: 'firewallBot', lane: 1 },   // v0.12.2 (Nova v1.1 §5.9): L5 = 31 bots (6 Firewalls), final wave 12. Awaiting Phill's OK
+        { t: 185.5, count: 1, type: 'firewallBot', lane: 1 },   // v0.12.2 (Nova v1.1 §5.9): L5 = 31 bots (6 Firewalls then; 8 since v0.15.0), final wave 12
         { t: 188,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 192,   count: 1, type: 'firewallBot', lane: 4 },   // v0.15.0 (Nova v1.2.1 L5 tweak, Mr.Beanz/Phill): was rugBot. L5 = 31 bots, 8 Firewalls
+      ],
+    },
+    // v0.15.0 L6 'Sideways Market' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L6, v1.2 swaps included; copied bot for bot)
+    6: {
+      lanes: [0, 1, 2, 3, 4],
+      cards: ['blaster', 'miner', 'wallet', 'flash', 'honey'],
+      hand: { fromRoster: true, always: ['blaster', 'miner', 'wallet', 'flash', 'honey'], max: 5 },
+      unlock: null,
+      airdrop: null,
+      badge: { id: 'badge_l6_sideways', name: 'Sideways Survivor', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
+      bannerAt: 170,
+      bigWaves: [98],
+      aftershock: [5, 9],
+      spawnSpacing: 60,
+      spawns: [
+        { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
+        { t: 38,    count: 1, type: 'rugBot',      lane: 1 },
+        { t: 52,    count: 1, type: 'rugBot',      lane: 3 },
+        { t: 66,    count: 1, type: 'rugBot',      lane: 0 },
+        { t: 78,    count: 1, type: 'rugBot',      lane: 4 },
+        { t: 88,    count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 98,    count: 1, type: 'firewallBot', lane: 1 },
+        { t: 99.5,  count: 1, type: 'rugBot',      lane: 1 },
+        { t: 104,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 116,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 122,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 128,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 134,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 146,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 147.5, count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 152,   count: 1, type: 'rugBot',      lane: 2 },
+        { t: 158,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 172,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 173.5, count: 1, type: 'rugBot',      lane: 2 },
+        { t: 175,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 176,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 180,   count: 1, type: 'rugBot',      lane: 1 },
+        { t: 182,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 188,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 192,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 196,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 198,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 202,   count: 1, type: 'firewallBot', lane: 4 },
+      ],
+    },
+    // v0.15.0 L7 'Double Top' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L7, v1.2 swaps included; copied bot for bot)
+    7: {
+      lanes: [0, 1, 2, 3, 4],
+      cards: ['blaster', 'miner', 'wallet', 'flash', 'honey'],
+      hand: { fromRoster: true, always: ['blaster', 'miner', 'wallet', 'flash', 'honey'], max: 5 },
+      unlock: null,
+      airdrop: null,
+      badge: { id: 'badge_l7_doubletop', name: 'Double Topper', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
+      bannerAt: 178,
+      bigWaves: [98],
+      aftershock: [5, 9],
+      spawnSpacing: 60,
+      spawns: [
+        { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
+        { t: 38,    count: 1, type: 'rugBot',      lane: 1 },
+        { t: 52,    count: 1, type: 'rugBot',      lane: 3 },
+        { t: 60,    count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 66,    count: 1, type: 'rugBot',      lane: 0 },
+        { t: 78,    count: 1, type: 'rugBot',      lane: 4 },
+        { t: 88,    count: 1, type: 'firewallBot', lane: 2 },
+        { t: 98,    count: 1, type: 'firewallBot', lane: 1 },
+        { t: 99.5,  count: 1, type: 'rugBot',      lane: 1 },
+        { t: 104,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 116,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 122,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 128,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 140,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 146,   count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 152,   count: 1, type: 'rugBot',      lane: 2 },
+        { t: 164,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 180,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 181.5, count: 1, type: 'rugBot',      lane: 2 },
+        { t: 183,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 184,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 186,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 188,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 192,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 196,   count: 1, type: 'rugBot',      lane: 1 },
+        { t: 196,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 198,   count: 1, type: 'pumpBot',     lane: 3 },
+      ],
+    },
+    // v0.15.0 L8 'Whale Alert' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L8, v1.2 swaps included; copied bot for bot)
+    8: {
+      lanes: [0, 1, 2, 3, 4],
+      cards: ['blaster', 'miner', 'wallet', 'flash', 'honey'],
+      hand: { fromRoster: true, always: ['blaster', 'miner', 'wallet', 'flash', 'honey'], max: 5 },
+      unlock: null,
+      airdrop: null,
+      badge: { id: 'badge_l8_whale', name: 'Whale Watcher', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
+      bannerAt: 180,
+      bigWaves: [110],
+      aftershock: [5, 9],
+      spawnSpacing: 60,
+      spawns: [
+        { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
+        { t: 36,    count: 1, type: 'rugBot',      lane: 1 },
+        { t: 50,    count: 1, type: 'rugBot',      lane: 3 },
+        { t: 62,    count: 1, type: 'rugBot',      lane: 0 },
+        { t: 74,    count: 1, type: 'rugBot',      lane: 4 },
+        { t: 82,    count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 90,    count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 98,    count: 1, type: 'firewallBot', lane: 3 },
+        { t: 110,   count: 1, type: 'tankBot',     lane: 2 },
+        { t: 118,   count: 1, type: 'rugBot',      lane: 1 },
+        { t: 118,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 124,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 132,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 138,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 146,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 154,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 160,   count: 1, type: 'rugBot',      lane: 2 },
+        { t: 166,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 182,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 183.5, count: 1, type: 'rugBot',      lane: 2 },
+        { t: 185,   count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 186,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 190,   count: 1, type: 'rugBot',      lane: 0 },
         { t: 192,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 198,   count: 1, type: 'rugBot',      lane: 1 },
+        { t: 202,   count: 1, type: 'rugBot',      lane: 3 },
+      ],
+    },
+    // v0.15.0 L9 'Capitulation' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L9, v1.2 swaps included; copied bot for bot)
+    9: {
+      lanes: [0, 1, 2, 3, 4],
+      cards: ['blaster', 'miner', 'wallet', 'flash', 'honey'],
+      hand: { fromRoster: true, always: ['blaster', 'miner', 'wallet', 'flash', 'honey'], max: 5 },
+      unlock: null,
+      airdrop: null,
+      badge: { id: 'badge_l9_diamond', name: 'Diamond Hands', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
+      bannerAt: 184,
+      bigWaves: [104, 150],
+      aftershock: [5, 9],
+      spawnSpacing: 60,
+      spawns: [
+        { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
+        { t: 34,    count: 1, type: 'rugBot',      lane: 1 },
+        { t: 46,    count: 1, type: 'rugBot',      lane: 3 },
+        { t: 58,    count: 1, type: 'rugBot',      lane: 0 },
+        { t: 70,    count: 1, type: 'rugBot',      lane: 4 },
+        { t: 78,    count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 86,    count: 1, type: 'firewallBot', lane: 1 },
+        { t: 94,    count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 104,   count: 1, type: 'tankBot',     lane: 1 },
+        { t: 108,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 114,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 120,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 126,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 132,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 138,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 144,   count: 1, type: 'rugBot',      lane: 2 },
+        { t: 150,   count: 1, type: 'tankBot',     lane: 3 },
+        { t: 154,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 160,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 166,   count: 1, type: 'firewallBot', lane: 4 },
+        { t: 172,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 176,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 186,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 187.5, count: 1, type: 'rugBot',      lane: 2 },
+        { t: 189,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 190,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 194,   count: 1, type: 'rugBot',      lane: 1 },
+        { t: 196,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 200,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 204,   count: 1, type: 'firewallBot', lane: 4 },
+        { t: 208,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 212,   count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 214,   count: 1, type: 'rugBot',      lane: 3 },
+      ],
+    },
+    // v0.15.0 L10 'Genesis Block' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L10, v1.2 swaps included; copied bot for bot)
+    10: {
+      lanes: [0, 1, 2, 3, 4],
+      cards: ['blaster', 'miner', 'wallet', 'flash', 'honey'],
+      hand: { fromRoster: true, always: ['blaster', 'miner', 'wallet', 'flash', 'honey'], max: 5 },
+      unlock: null,
+      airdrop: null,
+      badge: { id: 'badge_l10_genesis', name: 'Genesis Cleared', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
+      finale: true, // v0.15.0: win screen = Genesis epoch cleared (CONFIG.text.finale*), Replay / Menu
+      bannerAt: 196,
+      bigWaves: [100, 150],
+      aftershock: [5, 9],
+      spawnSpacing: 60,
+      spawns: [
+        { t: 20,    count: 1, type: 'rugBot',      lane: 2 },
+        { t: 32,    count: 1, type: 'rugBot',      lane: 1 },
+        { t: 44,    count: 1, type: 'rugBot',      lane: 3 },
+        { t: 56,    count: 1, type: 'rugBot',      lane: 0 },
+        { t: 68,    count: 1, type: 'rugBot',      lane: 4 },
+        { t: 76,    count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 84,    count: 1, type: 'pumpBot',     lane: 1 },
+        { t: 92,    count: 1, type: 'firewallBot', lane: 3 },
+        { t: 100,   count: 1, type: 'tankBot',     lane: 2 },
+        { t: 104,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 108,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 114,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 120,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 126,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 132,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 138,   count: 1, type: 'rugBot',      lane: 2 },
+        { t: 150,   count: 1, type: 'tankBot',     lane: 1 },
+        { t: 154,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 160,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 166,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 172,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 184,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 198,   count: 1, type: 'tankBot',     lane: 2 },
+        { t: 200,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 201,   count: 1, type: 'rugBot',      lane: 4 },
+        { t: 204,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 208,   count: 1, type: 'pumpBot',     lane: 3 },
+        { t: 210,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 214,   count: 1, type: 'firewallBot', lane: 4 },
+        { t: 218,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 226,   count: 1, type: 'pumpBot',     lane: 1 },
       ],
     },
   },
@@ -531,10 +757,14 @@ const CONFIG = {
       flashCard: '{v} the Flash Loan card', flashPlace: '{v} right in front of it', flashOnce: 'Flash Loans are one-shot. Time it',
       flashRecharge: 'Flash Loan recharges in 30 s', flashLate: 'Flash Loan ready. Hit the next shielded bot',
       honeyCard: '{v} the Honeypot card', honeyPlace: '{v} a tile in that bot\'s path', honeyNone: 'Drop a Honeypot in the next bot\'s path',
-      rooted: 'Stuck! The jar drains it dry', dump: 'It dumped! Slow and easy now' },
+      rooted: 'Stuck! The jar drains it dry', dump: 'It dumped! Slow and easy now',
+      // v0.15.0 L6-L10 (launch-10-levels 7)
+      mix: 'Mixed bots now. Match each counter', flashFirewall: 'Shielded bot? Flash Loan it', push: 'Big push coming. Save a Flash Loan',
+      tank: 'Wall it first. Then burst it down', twoTanks: 'Two Tanks today. Spread your Flash Loans', finale: 'Every bot, all at once. HODL!', lastTank: "Last Tank! Everything you've got" },
     sold: 'Sold! Gas back in the vault', sellPill: 'SELL', sellRefund: '+{n}', // v0.10 selling (pill reads "SELL +n", the +n in gold)
     soldFloat: '+{n} Gas', // v0.11 (Nova call 4): every sale floats this; 'sold' shows above it on the player's first sale only (saved: hodl.save soldOnce)
     free: 'FREE', airdropTag: 'AIRDROP', badge: 'Badge: {name} (stub)', // v0.11 airdrop card tag / free card cost label / L2 win-screen badge line (v0.11.1: saved; '(stub)' = no art yet)
+    finaleSub: 'Genesis epoch cleared', finaleMore: 'More epochs coming in updates', finaleMenu: 'Menu', // v0.15.0 L10 finale win screen (Nova plan 6)
   },
 
   // Progressive tutorial (Nova tutorial-spec v0.1). Times in seconds; guards / pulses are REAL time (the game is paused).
@@ -572,7 +802,7 @@ const CONFIG = {
     skipBtn: { x: 840, y: 500, w: 110, h: 44 }, skipAllBtn: { x: 130, y: 500, w: 150, h: 44 },
     intro: { w: 560, h: 340, scaleIn: 0.2, got: { x: 560, y: 405, w: 160, h: 48 }, skip: { x: 300, y: 405, w: 90, h: 44 } },
     compact: { x: 640, y: 40, w: 300, h: 56, time: 5 },
-    // tip/guide text = a CONFIG.text key ('tut.x' = CONFIG.text.tut.x). L4-L10 steps are LATER (not built).
+    // tip/guide text = a CONFIG.text key ('tut.x' = CONFIG.text.tut.x). L6-L10 steps added in v0.15.0.
     // needsUnlock: dormant unless the level has a reward card (L3 has none). needFirewall: valid only while the first Firewall lives and its lane has no Wallet.
     steps: [
       { id: 'L1.intro.blaster', type: 'intro', since: 1, level: 1, who: 'blaster', on: 'levelStart' },
@@ -627,6 +857,16 @@ const CONFIG = {
       { id: 'L5.tip.rooted', type: 'tip', since: 5, level: 5, on: 'firstRoot', text: 'tut.rooted', secs: 4 },
       { id: 'L5.intro.pump', type: 'intro', since: 5, level: 5, who: 'pumpBot', on: 'firstPumpInRange' },
       { id: 'L5.tip.dump', type: 'tip', since: 5, level: 5, on: 'firstDump', text: 'tut.dump', secs: 3 },
+      // v0.15.0 L6-L10 (launch-10-levels 7). at = toast at that game time; delay = s of game time after the chained intro closes;
+      // 'firewallFlashReady' = the first shielded Firewall in range (left edge <= botInRange) while the Flash card is ready (+ Flash pulse)
+      { id: 'L6.tip.mix', type: 'tip', since: 5, level: 6, on: 'time', at: 95, text: 'tut.mix', secs: 3 },
+      { id: 'L6.tip.flashFirewall', type: 'tip', since: 5, level: 6, on: 'firewallFlashReady', text: 'tut.flashFirewall', secs: 4, pulse: 'flash' },
+      { id: 'L7.tip.push', type: 'tip', since: 5, level: 7, on: 'time', at: 93, text: 'tut.push', secs: 5 },
+      { id: 'L8.intro.tank', type: 'intro', since: 5, level: 8, who: 'tankBot', on: 'firstTankInRange' },
+      { id: 'L8.tip.tank', type: 'tip', since: 5, level: 8, on: 'after:L8.intro.tank', delay: 3, text: 'tut.tank', secs: 4 },
+      { id: 'L9.tip.twoTanks', type: 'tip', since: 5, level: 9, on: 'time', at: 101, text: 'tut.twoTanks', secs: 3 },
+      { id: 'L10.tip.finale', type: 'tip', since: 5, level: 10, on: 'time', at: 1, text: 'tut.finale', secs: 4 },
+      { id: 'L10.tip.lastTank', type: 'tip', since: 5, level: 10, on: 'time', at: 195, text: 'tut.lastTank', secs: 3 },
     ],
     // Intro cards: bios + stats verbatim from Nova's character sheets (Card text). tag = role tag, color = border key.
     cards: {
@@ -649,6 +889,9 @@ const CONFIG = {
         stats: ['HP: N/A (trap, one bot)', 'Effect: Roots 6 s, drains 40 HP/s', 'Ready: at once, no arming', 'Cost: 50 Gas · Recharge: 15 s', 'Unlock: Airdrop in Level 5'], tip: 'Put it right in a bot\'s path.' },
       pumpBot: { name: 'Pump Bot', tag: 'BOT', color: 0x3ddc84, bio: 'Sprints in on pure hype, then dumps hard the moment it takes a real hit.',
         stats: ['HP: 200', 'Attack: Bite 40 HP/s', 'Speed: {spd:pumpBot} px/s (sprint)', 'Dump: at 100 HP or less, {spd:pumpBot:dump} px/s for good', 'Appears: Level 5'], tip: 'Jar it or wall it before it lands.' },
+      // v0.15.0 (launch-10-levels 2.4). colour = the grey-box placeholder body colour (art + colour TBD, Canvas)
+      tankBot: { name: 'Exit Liquidity Tank', tag: 'BOT', color: 0x6c7a89, bio: 'A slow, massive mountain of bot that chews through walls. It wants your vault as its exit.',
+        stats: ['HP: 1000', 'Attack: Bite 100 HP/s', 'Speed: {spd:tankBot} px/s ({spd:tankBot:rush} rushing)', 'Special: no knockback', 'Appears: Level 8'], tip: 'Stall it, then Flash Loan it.' },
     },
   },
 
@@ -670,7 +913,12 @@ const CONFIG = {
       // v0.12 (Nova §9.9). botKey: select-card bot colour from CONFIG.enemies. Names: frontEnd.levelNames (v0.12.1)
       { n: 4, epoch: 'Genesis', bot: 'Firewall Bot', botKey: 'firewallBot', unlock: null, airdrop: 'Flash Loan', unlockKey: 'flash', built: true },
       { n: 5, epoch: 'Genesis', bot: 'Pump Bot', botKey: 'pumpBot', unlock: null, airdrop: 'Honeypot', unlockKey: 'honey', newThreat: 'Pump Bot', built: true },
-      ...[6, 7, 8, 9, 10].map(n => ({ n, epoch: 'Genesis', bot: '???', unlock: '???', built: false })),
+      // v0.15.0 (Nova l6-l10 plan 4)
+      { n: 6, epoch: 'Genesis', bot: 'Mixed', unlock: null, built: true },
+      { n: 7, epoch: 'Genesis', bot: 'Mixed', unlock: null, built: true },
+      { n: 8, epoch: 'Genesis', bot: 'Exit Liquidity Tank', botKey: 'tankBot', newThreat: 'Exit Liquidity Tank', unlock: null, built: true },
+      { n: 9, epoch: 'Genesis', bot: '2 Tanks', unlock: null, built: true },
+      { n: 10, epoch: 'Genesis', bot: 'Finale', unlock: null, built: true },
       // v0.12 (Nova §9.14): the 'soon' entries for levels 11 / 21 / 31 / 41 are removed (hidden)
     ],
     howToPlay: ['Pick a Moon Blaster card, then a tile in the lane.', 'Catch falling Gas orbs to buy more Blasters.',
@@ -804,7 +1052,7 @@ class Level extends Phaser.Scene {
     this.tutOpen = null; this.tutQueue = []; this.tutRun = {}; this.tutAt = {}; this.compactPill = null; this.unlockTipHidden = false; // v0.8 tutorial
     this.tutFw = null; this.noReward = false; this.laneFirsts = this.laneTipPlan(); // v0.9
     this.airdrop = null; this.airdropDone = false; // v0.11 mid-level airdrop (reset on Retry)
-    this.traps = []; this.flashWait = null; this.guideBot = null; this.tutPump = null; this.airdropAt = null; // v0.12 Flash Loan / Honeypot / Pump Bot
+    this.traps = []; this.flashWait = null; this.guideBot = null; this.tutPump = null; this.tutTank = null; this.endMenu = false; this.endSelectText = null; this.airdropAt = null; // v0.12 Flash Loan / Honeypot / Pump Bot
     this.ghosts = []; this.tunnelPlan = new Map(); this.amb = null; this.cardBand = null; this.cardBandRight = 0; // v0.14 tunnel ghosts, ambient, card band
   }
   // v0.9 lane tips: the first scripted spawn in each lane not seen yet (the level's first spawn has botWarn), optionally only step.lanes
@@ -952,7 +1200,7 @@ class Level extends Phaser.Scene {
     if (this.restartBtn) { // end screen: Retry/Replay and Level Select
       if (performance.now() - this.endedAt < E.guard * 1000) return; // stray lane click guard
       if (hit(E.retryX, E.restartY, 200, 56)) { clickBuffer = []; this.log({ endBtn: 'retry' }); this.scene.restart({ level: this.levelId }); }
-      else if (hit(E.selectX, E.restartY, 200, 56)) { this.log({ endBtn: 'select' }); this.leave(); }
+      else if (hit(E.selectX, E.restartY, 200, 56)) { this.log({ endBtn: this.endMenu ? 'menu' : 'select' }); if (this.endMenu) { clickBuffer = null; fadeTo(this, 'Menu'); } else this.leave(); } // v0.15.0 L10 finale: Menu
       else if (clickBuffer) clickBuffer.push({ x: p.x, y: p.y, rightButtonDown: () => false });
       return;
     }
@@ -1206,6 +1454,7 @@ class Level extends Phaser.Scene {
     TUT_LIST.filter(st => st.level === this.levelId && st.on === 'levelStart' && !this.tutOpen && !this.tutQueue.length).forEach(st => this.tutChain(st.id));
     if (this.levelId === 2 && TUT.isSeen('L2.guide.minerPlace') && this.tutWant('L2.tip.rows')) this.tutAt.rows = this.lvl.spawns[0].t - CONFIG.tutorial.rowsBeforeSpawn;
     if (this.levelId === 3 && this.tutWant('L3.tip.rows') === 'full') this.tutAt.rows = CONFIG.tutorial.rowsDelay; // v0.9: 1 s in
+    TUT_LIST.forEach(st => { if (st.level === this.levelId && st.type === 'tip' && typeof st.at === 'number') this.tutAt[st.id] = st.at; }); // v0.15.0 L6-L10 timed toasts
   }
   // Fire every step of this level listening to `on`. Returns true if a full card/guide will show (callers hide the old hint).
   tutTrigger(on, o = {}) {
@@ -1234,6 +1483,7 @@ class Level extends Phaser.Scene {
   }
   tutChainTip(st) { // v0.11: a toast chained after an intro. needFirewall: only while the first Firewall lives and its lane has no Wallet
     if (st.needFirewall && !this.fwOk()) return;
+    if (st.delay) { this.tutAt[st.id] = this.t + st.delay; return; } // v0.15.0 (L8.tip.tank): fires st.delay s of game time later (tutStepTick)
     if (!this.tutTip(st.id, { lane: this.tutFw ? this.tutFw.lane : null })) return;
     const c = st.pulse && this.cards.find(c => c.key === st.pulse); if (c) { this.stopPulse(); this.startPulse(c); }
   }
@@ -1420,7 +1670,7 @@ class Level extends Phaser.Scene {
   }
   skipToast(id) {
     this.log({ tutToastSkip: id });
-    if (this.timed && this.timed.tut === id) { if (['nudge', 'teach2', 'secondMiner', 'moreMiners', 'walletFirewall'].includes(this.timed.id) && this.placedOnce) this.stopPulse(); this.timed.skipped = true; this.timed = null; }
+    if (this.timed && this.timed.tut === id) { if (['nudge', 'teach2', 'secondMiner', 'moreMiners', 'walletFirewall', 'flashFirewall'].includes(this.timed.id) && this.placedOnce) this.stopPulse(); this.timed.skipped = true; this.timed = null; }
     else if (id.endsWith('.tip.unlock')) { this.unlockTipHidden = true; this.tutMark(id, 'skipped'); }
     this.shownHint = null; this.updateHint();
   }
@@ -1480,6 +1730,17 @@ class Level extends Phaser.Scene {
         && !this.timed && this.tutWant('L3.tip.moreMiners') === 'full') {
       this.tutRun.moreMiners = true; this.stopPulse(); this.startPulse(miner);
       this.showTimed(TX.tut.moreMiners, TUT_STEPS['L3.tip.moreMiners'].secs, 'moreMiners', 'L3.tip.moreMiners');
+    }
+    for (const id of Object.keys(this.tutAt)) { // v0.15.0: timed tip toasts (step.at) and chained ones (step.delay), game time; tutTip checks hints / seen
+      if (id === 'rows' || !TUT_STEPS[id] || this.t < this.tutAt[id]) continue;
+      delete this.tutAt[id]; const st = TUT_STEPS[id];
+      if (this.tutTip(id)) { const c = st.pulse && this.cards.find(c => c.key === st.pulse); if (c) { this.stopPulse(); this.startPulse(c); } }
+    }
+    const ffId = L_ + '.tip.flashFirewall', ff = TUT_STEPS[ffId]; // v0.15.0 L6: the first shielded Firewall in range while the Flash card is ready
+    if (ff && !this.tutRun['shown:' + ffId] && !this.timed && this.tutWant(ffId) === 'full') {
+      const fl = this.cards.find(c => c.key === ff.pulse);
+      if (fl && !this.problems(fl, null).length && this.bots.some(b => !b.dead && b.e === CONFIG.enemies.firewallBot && b.shield > 0 && b.x - b.e.width / 2 <= TC.botInRange)
+          && this.tutTip(ffId)) { this.stopPulse(); this.startPulse(fl); }
     }
   }
   glowLanes(lanes, times, edge) { // outline pulse on whole lanes (rows tip) or a right-edge glow (incoming lane)
@@ -1559,6 +1820,7 @@ class Level extends Phaser.Scene {
     else if (who === 'flash') c.add([this.add.circle(0, 0, 70 * k).setStrokeStyle(4, 0xffffff), this.add.circle(0, 0, 50 * k, C.color).setStrokeStyle(3, 0), this.add.text(0, 0, 'FLASH', { fontSize: 18 * k + 'px', color: '#000', fontStyle: 'bold' }).setOrigin(0.5)]); // v0.12 grey-box
     else if (who === 'honey') c.add([this.add.rectangle(0, 12 * k, 96 * k, 104 * k, C.color).setStrokeStyle(3, 0), this.add.rectangle(0, -50 * k, 104 * k, 22 * k, CONFIG.defenders.honey.dripColor).setStrokeStyle(3, 0), this.add.rectangle(-26 * k, -28 * k, 14 * k, 26 * k, CONFIG.defenders.honey.dripColor), this.add.text(0, 12 * k, 'JAR', { fontSize: 20 * k + 'px', color: '#000', fontStyle: 'bold' }).setOrigin(0.5)]); // v0.12 grey-box
     else if (who === 'pumpBot') c.add([this.add.rectangle(0, 0, 90 * k, 110 * k, C.color).setStrokeStyle(3, 0), this.add.triangle(0, -78 * k, 0, 20 * k, 20 * k, 0, 40 * k, 20 * k, 0xffffff), this.add.text(0, -22 * k, '● ●', { fontSize: 20 * k + 'px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 22 * k, 'PUMP', { fontSize: 20 * k + 'px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5)]); // v0.12 grey-box
+    else if (who === 'tankBot') c.add([this.add.rectangle(0, 8 * k, 150 * k, 124 * k, C.color).setStrokeStyle(3, 0), this.add.rectangle(0, 74 * k, 160 * k, 14 * k, 0x2b2f3a).setStrokeStyle(2, 0), this.add.text(0, -16 * k, '● ●', { fontSize: 22 * k + 'px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 26 * k, 'TANK', { fontSize: 24 * k + 'px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5)]); // v0.15.0 grey-box (art: Canvas)
     else c.add([this.add.rectangle(0, 0, 120 * k, 140 * k, C.color).setStrokeStyle(3, 0), this.add.rectangle(0, -30 * k, 60 * k, 30 * k, 0x1b1e2e), this.add.text(0, -30 * k, '▪ ▪', { fontSize: 14 * k + 'px', color: '#8ecae6' }).setOrigin(0.5)]);
     return c;
   }
@@ -1750,7 +2012,7 @@ class Level extends Phaser.Scene {
     if (this.timed && this.timed.tut && !this.timed.overNoDef && this.noDefHintUp()) { // a tip toast waits up to noDefWait behind "No defenders!", then drops
       this.timed.wait = (this.timed.wait || 0) + dt; if (this.timed.wait > CONFIG.tutorial.noDefWait) { this.timed.dropped = true; this.log({ tutDropped: this.timed.tut }); this.timed = null; }
     }
-    if (this.timed && !(this.timed.tut && this.timed.left === Infinity)) { this.timed.left -= dt; if (this.timed.left <= 0) { if (['nudge', 'teach2', 'secondMiner', 'moreMiners', 'walletFirewall'].includes(this.timed.id) && this.placedOnce) this.stopPulse(); this.timed = null; } }
+    if (this.timed && !(this.timed.tut && this.timed.left === Infinity)) { this.timed.left -= dt; if (this.timed.left <= 0) { if (['nudge', 'teach2', 'secondMiner', 'moreMiners', 'walletFirewall', 'flashFirewall'].includes(this.timed.id) && this.placedOnce) this.stopPulse(); this.timed = null; } }
     if (this.compactPill && !this.compactPill.real && (this.compactPill.left -= dt) <= 0) this.hideCompact();
     this.tutStepTick(dt);
     if (this.bannerLeft > 0) this.bannerLeft -= dt;
@@ -1864,6 +2126,7 @@ class Level extends Phaser.Scene {
         if (!this.tutTrigger('firstFirewallInRange', { bot: b })) this.tutChain('L3.intro.firewall');
       }
       if (b.e === CONFIG.enemies.pumpBot && !this.tutPump && left <= CONFIG.tutorial.botInRange) { this.tutPump = b; this.log({ pumpInRange: b.lane }); this.tutTrigger('firstPumpInRange'); } // v0.12 L5.intro.pump
+      if (b.e === CONFIG.enemies.tankBot && !this.tutTank && left <= CONFIG.tutorial.botInRange) { this.tutTank = b; this.log({ tankInRange: b.lane }); if (!this.tutTrigger('firstTankInRange')) this.tutChain('L8.intro.tank'); } // v0.15.0 L8.intro.tank (left edge <= 1040)
       const brk = this.breakers[b.lane];
       if (!brk.used && left <= L.breakerX) { this.drawBot(b); this.fireBreaker(b.lane); continue; }
       if (brk.used && left <= L.vaultX) { b.x = L.vaultX + b.e.width / 2; this.drawBot(b); return this.lose(); } // clamp at vault edge
@@ -2035,7 +2298,7 @@ class Level extends Phaser.Scene {
     const N = CONFIG.tunnel, e = CONFIG.enemies[type], y = laneY(lane), sx = L.spawnX + off;
     const M = { x: N.mouth[0], y: N.mouth[1] }, Kn = toScr(sx + N.kneeDX, y), S = toScr(sx, y);
     const c = this.add.container(M.x, M.y).setDepth(laneDepth(lane, 3) - 0.01);
-    c.add([this.add.rectangle(0, 0, e.width, 60, e.color).setStrokeStyle(2, 0x000000), this.add.rectangle(-8, -12, 6, 6, 0xffffff), this.add.rectangle(8, -12, 6, 6, 0xffffff)]);
+    c.add([this.add.rectangle(0, 0, e.width, e.height || 60, e.color).setStrokeStyle(2, 0x000000), this.add.rectangle(-8, -12, 6, 6, 0xffffff), this.add.rectangle(8, -12, 6, 6, 0xffffff)]);
     if (e.shield) c.add(this.add.rectangle(0, 0, e.width + 14, 74).setStrokeStyle(4, e.shieldColor));
     const g = { c, M, Kn, S, l1: Math.hypot(Kn.x - M.x, Kn.y - M.y), l2: Math.hypot(S.x - Kn.x, S.y - Kn.y), t0, t1, k1: depthK(sx, y) };
     c.setScale(N.mouthScale).setAlpha(0);
@@ -2055,7 +2318,7 @@ class Level extends Phaser.Scene {
   spawnBot(type, lane, offset) {
     const e = CONFIG.enemies[type], y = laneY(lane), W = o => WL(o, lane); // v0.14: lane draw order
     const trail = [0, 1, 2].map(i => W(this.add.rectangle(0, y - 18 + i * 18, 14 + i * 4, 3, 0xffffff, 0.6).setDepth(3).setVisible(false)));
-    const body = W(this.add.rectangle(0, y, e.width, 60, e.color).setStrokeStyle(2, 0x000000).setDepth(3));
+    const body = W(this.add.rectangle(0, y, e.width, e.height || 60, e.color).setStrokeStyle(2, 0x000000).setDepth(3));
     const label = W(this.add.text(0, y + 12, e.label || 'RUG', { fontSize: '12px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(3));
     const eyes = W(this.add.text(0, y - 12, '● ●', { fontSize: '12px', color: '#fff' }).setOrigin(0.5).setDepth(3));
     const b = { e, lane, x: L.spawnX + offset, hp: e.hp, shield: e.shield || 0, flash: 0, body, label, eyes, trail, damaged: false, speed: e.speed * CONFIG.botSpeedScale, spawnT: this.t }; // v0.14: x botSpeedScale (Nova v1.2) // v0.12: speed (Pump dump), spawnT (L4 guide)
@@ -2084,8 +2347,8 @@ class Level extends Phaser.Scene {
       if (b.shield <= 0) this.breakShield(b);
     }
     b.hp -= dmg;
-    if (!o.dot) { b.flash = CONFIG.hitFlash; if (!(b.rootedUntil > this.t)) b.x += CONFIG.knockback; } // v0.12: a rooted bot isn't knocked back
-    if (!b.damaged && b.hp <= b.e.damagedAt) { b.damaged = true; b.eyes.setText('✕ ●'); b.label.setText(b.e.dumpLabel || 'RUG*');
+    if (!o.dot) { b.flash = CONFIG.hitFlash; if (!(b.rootedUntil > this.t)) b.x += b.e.knockback ?? CONFIG.knockback; } // v0.12: a rooted bot isn't knocked back. v0.15.0: per-bot knockback (Tank 0)
+    if (!b.damaged && b.hp <= b.e.damagedAt) { b.damaged = true; b.eyes.setText('✕ ●'); b.label.setText(b.e.dumpLabel || b.e.damagedLabel || 'RUG*');
       if (b.e.dumpSpeed !== undefined) { b.speed = b.e.dumpSpeed * CONFIG.botSpeedScale; /* v0.14 Nova v1.2 */ this.log({ pumpDump: b.lane }); this.tutTip('L5.tip.dump'); } } // v0.12 Pump Bot dumps for good
     if (b.hp <= 0) this.killBot(b);
   }
@@ -2368,7 +2631,13 @@ class Level extends Phaser.Scene {
     this.log({ rewardCollected: true });
     if (!this.tutTrigger('rewardCollected')) this.endWin(); // v0.8: the unlock intro card shows first (level over, so no pause needed)
   }
-  endWin() { const d = CONFIG.defenders[this.lvl.unlock]; this.endScreen('VAULT SAFE!', d ? `${d.name} unlocked` : TX.winNoUnlock.replace('{n}', this.levelId), '#80ff72', 'won'); this.badgeStub(); }
+  endFinale() { // v0.15.0 L10 (Nova plan 6): after SECURED, Genesis epoch cleared + badge + 'More epochs' line; buttons Replay / Menu. No reward card
+    this.endScreen('VAULT SAFE!', TX.finaleSub, '#80ff72', 'won'); if (this.state !== 'won') return;
+    this.endMenu = true; if (this.endSelectText) this.endSelectText.setText(TX.finaleMenu);
+    this.badgeStub();
+    this.add.text(CONFIG.width / 2, CONFIG.endScreen.finaleMoreY, TX.finaleMore, { fontSize: '20px', color: '#b8b3ff' }).setOrigin(0.5).setDepth(21);
+  }
+  endWin() { if (this.lvl.finale) return this.endFinale(); const d = CONFIG.defenders[this.lvl.unlock]; this.endScreen('VAULT SAFE!', d ? `${d.name} unlocked` : TX.winNoUnlock.replace('{n}', this.levelId), '#80ff72', 'won'); this.badgeStub(); }
   badgeStub() { // v0.11: L2 win-screen badge line (no art yet). v0.11.1 (Nova answer 1): named 'Cold Storage' and saved
     const B = this.lvl.badge; if (!B || this.state !== 'won') return;
     const isNew = recordBadge(B);
@@ -2393,7 +2662,7 @@ class Level extends Phaser.Scene {
     this.restartBtn = this.add.rectangle(E.retryX, ry, 200, 56, 0x6c63ff).setStrokeStyle(2, 0xffffff).setDepth(21);
     this.add.text(E.retryX, ry, state === 'won' ? 'Replay' : 'Retry', { fontSize: '24px', color: '#fff' }).setOrigin(0.5).setDepth(22);
     this.add.rectangle(E.selectX, ry, 200, 56, 0x2a2f45).setStrokeStyle(2, 0xffffff).setDepth(21);
-    this.add.text(E.selectX, ry, 'Level Select', { fontSize: '22px', color: '#fff' }).setOrigin(0.5).setDepth(22);
+    this.endSelectText = this.add.text(E.selectX, ry, 'Level Select', { fontSize: '22px', color: '#fff' }).setOrigin(0.5).setDepth(22); // v0.15.0 ref: L10 relabels it 'Menu'
   }
 }
 
@@ -2968,7 +3237,7 @@ class Select extends Phaser.Scene {
     c.add(txt(this, 0, 12, l.soon ? 'Coming soon' : l.bot, 12, locked ? '#555' : '#ddd', { bold: false }));
     c.add([this.add.rectangle(0, 62, 120, 40, locked ? 0x0b0c12 : 0x1b1e2e).setStrokeStyle(1, 0x55597a), this.add.rectangle(-44, 62, 20, 28, locked ? 0x05060a : (CONFIG.defenders[l.unlockKey]?.color ?? 0x55597a)),
       // v0.11 (Nova call 5): #ff8fa3 on the label box #1b1e2e = 7.63:1 (WCAG; 6.10:1 even on the card body #2a2f45) >= 4.5:1 -> kept
-      txt(this, 8, 62, l.newThreat ? `New threat:\n${l.newThreat}` : l.airdrop ? `Airdrop:\n${locked ? '???' : l.airdrop}` : `Unlocks:\n${locked ? '???' : l.unlock}`, 10, locked ? '#555' : (l.newThreat ? '#ff8fa3' : '#ffe66d'), { bold: false })]);
+      txt(this, 8, 62, l.newThreat ? `New threat:\n${l.newThreat}` : l.airdrop ? `Airdrop:\n${locked ? '???' : l.airdrop}` : !l.unlock && CONFIG.levels[l.n]?.badge ? `Badge:\n${locked ? '???' : CONFIG.levels[l.n].badge.name}` : `Unlocks:\n${locked ? '???' : l.unlock}`, 10, locked ? '#555' : (l.newThreat ? '#ff8fa3' : '#ffe66d'), { bold: false })]);
     if (st === 'cleared') c.add(this.add.image(60, -86, 'ico-check').setDisplaySize(30, 30));
     if (locked) c.add(this.add.image(0, -50, 'ico-lock').setDisplaySize(26, 26));
     return { l, i, c, st };

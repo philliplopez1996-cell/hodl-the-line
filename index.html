@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.2)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.5)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -167,6 +167,9 @@ const CONFIG = {
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   dev: {
     unlockAll: true, // TURN OFF BEFORE SHIP
+    // v0.15.3 (Nova l6-l10-difficulty-v1.6 3.1): levels with their own startGas (L6-L10) open with it; false = every level
+    // opens with CONFIG.startGas (175). Waiting on Phill's own OK (his rule: start Gas 175): flip to false to revert.
+    perLevelStartGas: false, // v0.15.5 (Nova v1.7 3.1): per-level startGas dropped (Phill: start Gas 175 everywhere); hook unused, no level has startGas
     tag: 'DEV: all levels unlocked',
     // Only while unlockAll is on: intro cards a player who jumped ahead never saw show once at the start of `level`
     // (same mechanism as tutorial.introFallbacks). L3 uses the Cold Wallet, whose intro normally shows at the L2 airdrop (v0.11).
@@ -178,7 +181,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.2',
+  build: '0.15.5',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -220,10 +223,11 @@ const CONFIG = {
     fence: { at: [454, 80], z: 35 },  // top-left; drawn over the train, only while a train runs (unused since v0.15.1: old train off)
     // v0.15.1 tunnel train (Phill approved the preview; previews/train-tunnel/). A 4-car minecart (ore_train sheet) comes nose-first out of
     // the tunnel by the signal light (the tunnelFront cover hides it until it is out), follows the painted rails down-right, leaves the
-    // screen at the right edge, waits pauseSec and loops. Background only (no gameplay effect). Runs on the ambient clock.
+    // screen at the right edge and loops every periodSec (v0.15.4). Background only (no gameplay effect). Runs on the ambient clock.
     tunnelTrain: {
       on: true,
-      pauseSec: 4, // GAP BETWEEN TRAINS in seconds (one run ~3.9 s + 4 s = a train every ~7.9 s). PHILL WILL TUNE THIS after playing: raise to 10-20 if it feels busy. ?ambient=lite doubles it.
+      periodSec: 16, // time between trains; Phill tunes this. v0.15.4 (Phill): seconds from one train's nose coming out of the tunnel to the next one's
+                     // (the wait after a train leaves = max(0, periodSec - run time); one run is ~5.7 s). ?ambient=lite: x litePeriodK (32 s)
       path: [[891, 128], [887, 160], [875, 180], [877, 198], [894, 220], [918, 241], [960, 272], [1010, 304], [1060, 336], [1110, 368]], // 960x540 screen px, starts inside the tunnel; past x 960 = off-screen run-out. v0.15.2: y 180-241 points moved onto the measured track centre
       seg: 12,             // Catmull-Rom samples per path span (built once per level into a polyline table)
       speed: 80,           // px/s along the path
@@ -236,7 +240,7 @@ const CONFIG = {
       cars: [[0, 26], [26, 17.5], [43.5, 17], [60.5, 16.5]], // 1x [x, w] slices of each ore_train frame: loco, cart, cart, cart
       fps: 6, frames: 2, alpha: 1, tint: 0xd2c4b4, // 2-frame bob; tint knocks back the far-prop haze a bit
       exitX: 960, exitPad: 4, // run ends when the last car's left edge is past exitX + exitPad
-      first: [3, 6], litePauseK: 2, // first run 3-6 s into the level; ?ambient=lite: pauseSec x litePauseK and no bob
+      first: [3, 6], litePeriodK: 2, // first run 3-6 s into the level; ?ambient=lite: periodSec x litePeriodK and no bob
       z: 30, coverZ: 32,   // train cars z 30 + y/1000 (< 32), under the tunnel front cover (32), the signal (46) and the board (-9)
       cover: { at: [840, 82] }, // tunnelFront image top-left (94x92 at 1x); only drawn while a train runs
       signal: { approachFrame: 1, goFrame: 2, goHold: 0.4 }, // red while the train is inside, teal from nose-out to tail-out + goHold s (wave warning / all-clear still win)
@@ -578,10 +582,10 @@ const CONFIG = {
       airdrop: null,
       badge: { id: 'badge_l6_sideways', name: 'Sideways Survivor', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
       bannerAt: 170,
-      bigWaves: [98],
+      bigWaves: [98, 158],
       aftershock: [5, 9],
       spawnSpacing: 60,
-      spawns: [
+      spawns: [ // v1.7: Nova l6-l10-difficulty-v1.7 = launch-10/waves10_v17.py L6 (startGas 175, no per-level startGas)
         { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
         { t: 38,    count: 1, type: 'rugBot',      lane: 1 },
         { t: 52,    count: 1, type: 'rugBot',      lane: 3 },
@@ -598,17 +602,17 @@ const CONFIG = {
         { t: 146,   count: 1, type: 'firewallBot', lane: 1 },
         { t: 147.5, count: 1, type: 'pumpBot',     lane: 1 },
         { t: 152,   count: 1, type: 'rugBot',      lane: 2 },
-        { t: 158,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 158,   count: 2, type: 'firewallBot', lane: 3 },
         { t: 172,   count: 1, type: 'firewallBot', lane: 2 },
-        { t: 173.5, count: 1, type: 'rugBot',      lane: 2 },
+        { t: 173.5, count: 2, type: 'rugBot',      lane: 2 },
         { t: 175,   count: 1, type: 'pumpBot',     lane: 0 },
-        { t: 176,   count: 1, type: 'pumpBot',     lane: 4 },
+        { t: 176,   count: 2, type: 'pumpBot',     lane: 4 },
         { t: 180,   count: 1, type: 'rugBot',      lane: 1 },
-        { t: 182,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 182,   count: 2, type: 'rugBot',      lane: 3 },
         { t: 188,   count: 1, type: 'pumpBot',     lane: 2 },
-        { t: 192,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 192,   count: 2, type: 'firewallBot', lane: 1 },
         { t: 196,   count: 1, type: 'pumpBot',     lane: 3 },
-        { t: 198,   count: 1, type: 'rugBot',      lane: 0 },
+        { t: 198,   count: 2, type: 'rugBot',      lane: 0 },
         { t: 202,   count: 1, type: 'firewallBot', lane: 4 },
       ],
     },
@@ -624,7 +628,7 @@ const CONFIG = {
       bigWaves: [98],
       aftershock: [5, 9],
       spawnSpacing: 60,
-      spawns: [
+      spawns: [ // v1.7: Nova l6-l10-difficulty-v1.7 = launch-10/waves10_v17.py L7 (startGas 175, no per-level startGas)
         { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
         { t: 38,    count: 1, type: 'rugBot',      lane: 1 },
         { t: 52,    count: 1, type: 'rugBot',      lane: 3 },
@@ -642,15 +646,15 @@ const CONFIG = {
         { t: 146,   count: 1, type: 'pumpBot',     lane: 1 },
         { t: 152,   count: 1, type: 'rugBot',      lane: 2 },
         { t: 164,   count: 1, type: 'firewallBot', lane: 0 },
-        { t: 180,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 180,   count: 2, type: 'firewallBot', lane: 2 },
         { t: 181.5, count: 1, type: 'rugBot',      lane: 2 },
-        { t: 183,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 183,   count: 2, type: 'pumpBot',     lane: 0 },
         { t: 184,   count: 1, type: 'pumpBot',     lane: 4 },
-        { t: 186,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 186,   count: 2, type: 'firewallBot', lane: 1 },
         { t: 188,   count: 1, type: 'rugBot',      lane: 3 },
-        { t: 192,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 192,   count: 2, type: 'pumpBot',     lane: 2 },
         { t: 196,   count: 1, type: 'rugBot',      lane: 1 },
-        { t: 196,   count: 1, type: 'firewallBot', lane: 3 },
+        { t: 196,   count: 2, type: 'firewallBot', lane: 3 },
         { t: 198,   count: 1, type: 'pumpBot',     lane: 3 },
       ],
     },
@@ -663,10 +667,10 @@ const CONFIG = {
       airdrop: null,
       badge: { id: 'badge_l8_whale', name: 'Whale Watcher', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
       bannerAt: 180,
-      bigWaves: [110],
+      bigWaves: [110, 150],
       aftershock: [5, 9],
       spawnSpacing: 60,
-      spawns: [
+      spawns: [ // v1.7: Nova l6-l10-difficulty-v1.7 = launch-10/waves10_v17.py L8 (startGas 175, no per-level startGas)
         { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
         { t: 36,    count: 1, type: 'rugBot',      lane: 1 },
         { t: 50,    count: 1, type: 'rugBot',      lane: 3 },
@@ -676,23 +680,24 @@ const CONFIG = {
         { t: 90,    count: 1, type: 'pumpBot',     lane: 1 },
         { t: 98,    count: 1, type: 'firewallBot', lane: 3 },
         { t: 110,   count: 1, type: 'tankBot',     lane: 2 },
-        { t: 118,   count: 1, type: 'rugBot',      lane: 1 },
         { t: 118,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 118,   count: 1, type: 'rugBot',      lane: 1 },
         { t: 124,   count: 1, type: 'pumpBot',     lane: 3 },
         { t: 132,   count: 1, type: 'firewallBot', lane: 0 },
         { t: 138,   count: 1, type: 'rugBot',      lane: 4 },
         { t: 146,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 150,   count: 1, type: 'tankBot',     lane: 0 },
         { t: 154,   count: 1, type: 'rugBot',      lane: 3 },
         { t: 160,   count: 1, type: 'rugBot',      lane: 2 },
         { t: 166,   count: 1, type: 'pumpBot',     lane: 0 },
-        { t: 182,   count: 1, type: 'firewallBot', lane: 2 },
-        { t: 183.5, count: 1, type: 'rugBot',      lane: 2 },
-        { t: 185,   count: 1, type: 'pumpBot',     lane: 1 },
-        { t: 186,   count: 1, type: 'pumpBot',     lane: 3 },
-        { t: 190,   count: 1, type: 'rugBot',      lane: 0 },
-        { t: 192,   count: 1, type: 'rugBot',      lane: 4 },
-        { t: 198,   count: 1, type: 'rugBot',      lane: 1 },
-        { t: 202,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 182,   count: 2, type: 'firewallBot', lane: 2 },
+        { t: 183.5, count: 2, type: 'rugBot',      lane: 2 },
+        { t: 185,   count: 2, type: 'pumpBot',     lane: 1 },
+        { t: 186,   count: 2, type: 'pumpBot',     lane: 3 },
+        { t: 190,   count: 2, type: 'rugBot',      lane: 0 },
+        { t: 192,   count: 2, type: 'rugBot',      lane: 4 },
+        { t: 198,   count: 2, type: 'rugBot',      lane: 1 },
+        { t: 202,   count: 2, type: 'rugBot',      lane: 3 },
       ],
     },
     // v0.15.0 L9 'Capitulation' (Nova l6-l10-build-plan + launch-10/waves10_v12.py L9, v1.2 swaps included; copied bot for bot)
@@ -704,10 +709,10 @@ const CONFIG = {
       airdrop: null,
       badge: { id: 'badge_l9_diamond', name: 'Diamond Hands', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
       bannerAt: 184,
-      bigWaves: [104, 150],
+      bigWaves: [104, 126, 150],
       aftershock: [5, 9],
       spawnSpacing: 60,
-      spawns: [
+      spawns: [ // v1.7: Nova l6-l10-difficulty-v1.7 = launch-10/waves10_v17.py L9 (startGas 175, no per-level startGas)
         { t: 22,    count: 1, type: 'rugBot',      lane: 2 },
         { t: 34,    count: 1, type: 'rugBot',      lane: 1 },
         { t: 46,    count: 1, type: 'rugBot',      lane: 3 },
@@ -721,6 +726,7 @@ const CONFIG = {
         { t: 114,   count: 1, type: 'pumpBot',     lane: 0 },
         { t: 120,   count: 1, type: 'pumpBot',     lane: 2 },
         { t: 126,   count: 1, type: 'rugBot',      lane: 3 },
+        { t: 126,   count: 1, type: 'tankBot',     lane: 4 },
         { t: 132,   count: 1, type: 'firewallBot', lane: 0 },
         { t: 138,   count: 1, type: 'pumpBot',     lane: 4 },
         { t: 144,   count: 1, type: 'rugBot',      lane: 2 },
@@ -753,10 +759,10 @@ const CONFIG = {
       badge: { id: 'badge_l10_genesis', name: 'Genesis Cleared', stub: true }, // name = Nova's proposal (TBD); stub = no art yet
       finale: true, // v0.15.0: win screen = Genesis epoch cleared (CONFIG.text.finale*), Replay / Menu
       bannerAt: 196,
-      bigWaves: [100, 150],
+      bigWaves: [100, 126, 150, 160],
       aftershock: [5, 9],
       spawnSpacing: 60,
-      spawns: [
+      spawns: [ // v1.7: Nova l6-l10-difficulty-v1.7 = launch-10/waves10_v17.py L10 (startGas 175, no per-level startGas)
         { t: 20,    count: 1, type: 'rugBot',      lane: 2 },
         { t: 32,    count: 1, type: 'rugBot',      lane: 1 },
         { t: 44,    count: 1, type: 'rugBot',      lane: 3 },
@@ -771,22 +777,25 @@ const CONFIG = {
         { t: 114,   count: 1, type: 'pumpBot',     lane: 3 },
         { t: 120,   count: 1, type: 'firewallBot', lane: 1 },
         { t: 126,   count: 1, type: 'pumpBot',     lane: 0 },
+        { t: 126,   count: 1, type: 'tankBot',     lane: 3 },
         { t: 132,   count: 1, type: 'rugBot',      lane: 4 },
         { t: 138,   count: 1, type: 'rugBot',      lane: 2 },
         { t: 150,   count: 1, type: 'tankBot',     lane: 1 },
         { t: 154,   count: 1, type: 'pumpBot',     lane: 3 },
-        { t: 160,   count: 1, type: 'firewallBot', lane: 0 },
+        { t: 160,   count: 2, type: 'firewallBot', lane: 0 },
         { t: 166,   count: 1, type: 'pumpBot',     lane: 4 },
-        { t: 172,   count: 1, type: 'firewallBot', lane: 2 },
+        { t: 172,   count: 2, type: 'firewallBot', lane: 2 },
         { t: 184,   count: 1, type: 'rugBot',      lane: 3 },
         { t: 198,   count: 1, type: 'tankBot',     lane: 2 },
         { t: 200,   count: 1, type: 'rugBot',      lane: 0 },
         { t: 201,   count: 1, type: 'rugBot',      lane: 4 },
         { t: 204,   count: 1, type: 'firewallBot', lane: 1 },
+        { t: 206,   count: 1, type: 'tankBot',     lane: 4 },
         { t: 208,   count: 1, type: 'pumpBot',     lane: 3 },
         { t: 210,   count: 1, type: 'firewallBot', lane: 0 },
         { t: 214,   count: 1, type: 'firewallBot', lane: 4 },
         { t: 218,   count: 1, type: 'pumpBot',     lane: 2 },
+        { t: 222,   count: 1, type: 'tankBot',     lane: 3 },
         { t: 226,   count: 1, type: 'pumpBot',     lane: 1 },
       ],
     },
@@ -821,7 +830,9 @@ const CONFIG = {
       rooted: 'Stuck! The jar drains it dry', dump: 'It dumped! Slow and easy now',
       // v0.15.0 L6-L10 (launch-10-levels 7)
       mix: 'Mixed bots now. Match each counter', flashFirewall: 'Shielded bot? Flash Loan it', push: 'Big push coming. Save a Flash Loan',
-      tank: 'Wall it first. Then burst it down', twoTanks: 'Two Tanks today. Spread your Flash Loans', finale: 'Every bot, all at once. HODL!', lastTank: "Last Tank! Everything you've got" },
+      tank: 'Wall it first. Then burst it down', twoTanks: 'Three Tanks today. Spread your Flash Loans', finale: 'Every bot, all at once. HODL!', lastTank: "Final wave: 3 Tanks. Everything you've got",
+      // v0.15.3 (Nova l6-l10-difficulty-v1.6 3.2)
+      tank2: 'Another Tank! Wall it, then burst it', moreTanks: 'Tanks keep coming. Keep a Flash Loan ready' },
     sold: 'Sold! Gas back in the vault', sellPill: 'SELL', sellRefund: '+{n}', // v0.10 selling (pill reads "SELL +n", the +n in gold)
     soldFloat: '+{n} Gas', // v0.11 (Nova call 4): every sale floats this; 'sold' shows above it on the player's first sale only (saved: hodl.save soldOnce)
     free: 'FREE', airdropTag: 'AIRDROP', badge: 'Badge: {name} (stub)', // v0.11 airdrop card tag / free card cost label / L2 win-screen badge line (v0.11.1: saved; '(stub)' = no art yet)
@@ -832,7 +843,7 @@ const CONFIG = {
   // Step types: 'intro' (paused modal card), 'guide' (paused spotlight + pointer), 'tip' (toast on the hint line).
   // Every step shows once per player (saved in localStorage 'hodl.tutorial'); perRun steps once per run.
   tutorial: {
-    version: 5, guard: 0.4,  // v0.12: version 5 (Nova tutorial-spec v5: L4 / L5 steps; L3.tip.unlock + L3.intro.flashloan removed -> pruned)
+    version: 6, guard: 0.4,  // v0.15.3: version 6 (Nova l6-l10-difficulty-v1.6: L8.tip.tank2, L10.tip.moreTanks). v0.12: version 5 (Nova tutorial-spec v5: L4 / L5 steps; L3.tip.unlock + L3.intro.flashloan removed -> pruned)
     // v0.11: version 4 (Nova: L2 Wallet guide + L3.tip.walletFirewall; L3.guide.wallet* removed -> pruned from saves). v0.10: 3 (L2.tip.sell). v0.9: 2
     introGuard: 0.6, redemo: 10, skipPulse: 20, introPulse: 8, dim: 0.65, introDim: 0.6,
     fadeIn: 0.25, pointerStart: 0.25, pad: 12, radius: 12, orbPad: 8, toastSecs: 5, noDefWait: 3, skipAllToast: 3,
@@ -925,8 +936,10 @@ const CONFIG = {
       { id: 'L7.tip.push', type: 'tip', since: 5, level: 7, on: 'time', at: 93, text: 'tut.push', secs: 5 },
       { id: 'L8.intro.tank', type: 'intro', since: 5, level: 8, who: 'tankBot', on: 'firstTankInRange' },
       { id: 'L8.tip.tank', type: 'tip', since: 5, level: 8, on: 'after:L8.intro.tank', delay: 3, text: 'tut.tank', secs: 4 },
+      { id: 'L8.tip.tank2', type: 'tip', since: 6, level: 8, on: 'time', at: 147, text: 'tut.tank2', secs: 3 }, // v0.15.3 (Nova v1.6 3.3): 2nd Tank at 150 s
       { id: 'L9.tip.twoTanks', type: 'tip', since: 5, level: 9, on: 'time', at: 101, text: 'tut.twoTanks', secs: 3 },
       { id: 'L10.tip.finale', type: 'tip', since: 5, level: 10, on: 'time', at: 1, text: 'tut.finale', secs: 4 },
+      { id: 'L10.tip.moreTanks', type: 'tip', since: 6, level: 10, on: 'time', at: 123, text: 'tut.moreTanks', secs: 3 }, // v0.15.3 (Nova v1.6 3.3): Tank at 126 s
       { id: 'L10.tip.lastTank', type: 'tip', since: 5, level: 10, on: 'time', at: 195, text: 'tut.lastTank', secs: 3 },
     ],
     // Intro cards: bios + stats verbatim from Nova's character sheets (Card text). tag = role tag, color = border key.
@@ -975,11 +988,12 @@ const CONFIG = {
       { n: 4, epoch: 'Genesis', bot: 'Firewall Bot', botKey: 'firewallBot', unlock: null, airdrop: 'Flash Loan', unlockKey: 'flash', built: true },
       { n: 5, epoch: 'Genesis', bot: 'Pump Bot', botKey: 'pumpBot', unlock: null, airdrop: 'Honeypot', unlockKey: 'honey', newThreat: 'Pump Bot', built: true },
       // v0.15.0 (Nova l6-l10 plan 4)
-      { n: 6, epoch: 'Genesis', bot: 'Mixed', unlock: null, built: true },
-      { n: 7, epoch: 'Genesis', bot: 'Mixed', unlock: null, built: true },
-      { n: 8, epoch: 'Genesis', bot: 'Exit Liquidity Tank', botKey: 'tankBot', newThreat: 'Exit Liquidity Tank', unlock: null, built: true },
-      { n: 9, epoch: 'Genesis', bot: '2 Tanks', unlock: null, built: true },
-      { n: 10, epoch: 'Genesis', bot: 'Finale', unlock: null, built: true },
+      // v0.15.3 (Nova v1.6 3.4): {gas} = that level's opening Gas (levelStartGas), so the card always matches CONFIG. v0.15.5 (Nova v1.7 3.4): L6 / L7 / L10 lines; {gas} = 175
+      { n: 6, epoch: 'Genesis', bot: 'Late pairs · start {gas} Gas', unlock: null, built: true },
+      { n: 7, epoch: 'Genesis', bot: 'Big final wave · start {gas} Gas', unlock: null, built: true },
+      { n: 8, epoch: 'Genesis', bot: '2 Tanks · start {gas} Gas', botKey: 'tankBot', newThreat: 'Exit Liquidity Tank', unlock: null, built: true },
+      { n: 9, epoch: 'Genesis', bot: '3 Tanks · start {gas} Gas', unlock: null, built: true },
+      { n: 10, epoch: 'Genesis', bot: 'Finale · 6 Tanks · start {gas} Gas', unlock: null, built: true },
       // v0.12 (Nova §9.14): the 'soon' entries for levels 11 / 21 / 31 / 41 are removed (hidden)
     ],
     howToPlay: ['Pick a Moon Blaster card, then a tile in the lane.', 'Catch falling Gas orbs to buy more Blasters.',
@@ -992,6 +1006,8 @@ const CONFIG = {
 const params = new URLSearchParams(location.search);
 if (params.has('speed')) { CONFIG.debug.timeScale = Number(params.get('speed')) || 1; CONFIG.debug.showClock = true; }
 if (params.has('gas')) CONFIG.startGas = Number(params.get('gas'));
+// v0.15.3: opening Gas of level n (spec 3.1: ?gas= still wins; CONFIG.dev.perLevelStartGas off = CONFIG.startGas everywhere)
+const levelStartGas = n => (params.has('gas') || !(CONFIG.dev && CONFIG.dev.perLevelStartGas)) ? CONFIG.startGas : (CONFIG.levels[n]?.startGas ?? CONFIG.startGas);
 // ?spawn=firewallBot@5 adds a debug spawn (type@time[:x offset from spawnX][#lane], comma list); ?waves=0 drops the level's own spawns
 if (params.get('spawn')) CONFIG.debug.spawns = params.get('spawn').split(',').map(s => { const [type, rest0 = '0'] = s.split('@'), [rest, ln] = rest0.split('#'), [t, off] = rest.split(':').map(Number);
   return { t, count: 1, type, offset: off || 0, debug: true, ...(ln !== undefined && ln !== '' ? { lane: Number(ln) } : {}) }; }).filter(w => CONFIG.enemies[w.type] && w.t >= 0);
@@ -1119,7 +1135,7 @@ class Level extends Phaser.Scene {
   init(data) {
     this.levelId = data.level || 1;
     this.lvl = CONFIG.levels[this.levelId];
-    this.t = 0; this.realT = 0; this.gas = CONFIG.startGas; this.state = 'playing';
+    this.t = 0; this.realT = 0; this.gas = levelStartGas(this.levelId); this.state = 'playing'; // v0.15.3 per-level startGas (?gas= still wins)
     this.defenders = []; this.bots = []; this.bullets = []; this.orbs = [];
     this.queue = (CONFIG.debug.noWaves ? [] : this.lvl.spawns.map(s => ({ ...s })))   // pending spawns (+ aftershock)
       .concat(CONFIG.debug.spawns || []).sort((a, b) => a.t - b.t);                    // + debug spawns (?spawn=)
@@ -2384,7 +2400,7 @@ class Level extends Phaser.Scene {
     const cars = T.cars.map((c, i) => ({ o: img('train', 0, 0, 0.5, 1, T.z, 'tt' + i + '_0').setFlipX(true).setTint(T.tint).setAlpha(T.alpha).setVisible(false), d: 0, x: 0, y: 0, s: 1, fx: 1, rot: 0, w: c[1] }));
     const cover = img('tunnelFront', T.cover.at[0], T.cover.at[1], 0, 0, T.coverZ).setVisible(false);
     return { T, xs, ys, cum, ss, len: cum[N - 1], cars, cover, on: false, t0: 0, f: -1, sig: -1, noseOut: false, tailOutAt: -1,
-             pauseK: lite ? T.litePauseK : 1, bob: !lite, next: rand(T.first[0], T.first[1]) };
+             periodK: lite ? T.litePeriodK : 1, bob: !lite, next: rand(T.first[0], T.first[1]), sched: 0 };
   }
   tunnelTrainPose(tt, d, c) { // car c at path distance d -> c.x / y / s / fx / rot (no allocation)
     const T = tt.T, cum = tt.cum, L = cum.length - 1;
@@ -2400,7 +2416,7 @@ class Level extends Phaser.Scene {
     const T = tt.T, cars = tt.cars;
     if (!tt.on) {
       if (t < tt.next) return;
-      tt.on = true; tt.t0 = t; tt.noseOut = false; tt.tailOutAt = -1; tt.f = -1; tt.cover.setVisible(true);
+      tt.on = true; tt.t0 = t; tt.sched = tt.next; tt.noseOut = false; tt.tailOutAt = -1; tt.f = -1; tt.cover.setVisible(true);
     }
     const a = t - tt.t0; let d = a * T.speed;
     for (let i = 0; i < cars.length; i++) { // nose first; each car sits half-widths behind the one ahead, at the local scale / squash
@@ -2416,8 +2432,9 @@ class Level extends Phaser.Scene {
     if (!tt.noseOut && cars[0].y >= T.mouthY) tt.noseOut = true;
     if (tt.tailOutAt < 0 && tail.y >= T.mouthY) tt.tailOutAt = a;
     tt.sig = !tt.noseOut ? T.signal.approachFrame : (tt.tailOutAt < 0 || a - tt.tailOutAt < T.signal.goHold) ? T.signal.goFrame : -1;
-    if (tail.x - tail.w / 2 * tail.s * tail.fx > T.exitX + T.exitPad) { // gone: hide, wait pauseSec (x2 in lite), loop
-      tt.on = false; tt.sig = -1; tt.next = t + T.pauseSec * tt.pauseK; tt.cover.setVisible(false);
+    if (tail.x - tail.w / 2 * tail.s * tail.fx > T.exitX + T.exitPad) { // gone: hide, wait, loop
+      // v0.15.4: pause = max(0, period - runSec), runSec from the scheduled start -> starts (and so nose-outs) exactly periodSec apart (x2 in lite)
+      tt.on = false; tt.sig = -1; tt.next = t + Math.max(0, T.periodSec * tt.periodK - (t - tt.sched)); tt.cover.setVisible(false);
       for (let i = 0; i < cars.length; i++) cars[i].o.setVisible(false);
     }
   }
@@ -3457,7 +3474,7 @@ class Select extends Phaser.Scene {
     const fire = l.bot === 'Firewall Bot', unknown = l.bot === '???';
     if (!unknown) c.add(drawBot(this, 0, -22, { dark: locked, color: CONFIG.enemies[l.botKey]?.color ?? (fire ? 0x9b5de5 : 0xe63946), k: 0.8 })); // v0.12: botKey (L4 / L5)
     else c.add(txt(this, 0, -22, '?', 40, '#333'));
-    c.add(txt(this, 0, 12, l.soon ? 'Coming soon' : l.bot, 12, locked ? '#555' : '#ddd', { bold: false }));
+    c.add(txt(this, 0, 12, l.soon ? 'Coming soon' : l.bot.replace('{gas}', levelStartGas(l.n)), 12, locked ? '#555' : '#ddd', { bold: false, style: { wordWrap: { width: FE.nameMaxW } } })); // v0.15.3: {gas} + wrap
     c.add([this.add.rectangle(0, 62, 120, 40, locked ? 0x0b0c12 : 0x1b1e2e).setStrokeStyle(1, 0x55597a), this.add.rectangle(-44, 62, 20, 28, locked ? 0x05060a : (CONFIG.defenders[l.unlockKey]?.color ?? 0x55597a)),
       // v0.11 (Nova call 5): #ff8fa3 on the label box #1b1e2e = 7.63:1 (WCAG; 6.10:1 even on the card body #2a2f45) >= 4.5:1 -> kept
       txt(this, 8, 62, l.newThreat ? `New threat:\n${l.newThreat}` : l.airdrop ? `Airdrop:\n${locked ? '???' : l.airdrop}` : !l.unlock && CONFIG.levels[l.n]?.badge ? `Badge:\n${locked ? '???' : CONFIG.levels[l.n].badge.name}` : `Unlocks:\n${locked ? '???' : l.unlock}`, 10, locked ? '#555' : (l.newThreat ? '#ff8fa3' : '#ffe66d'), { bold: false })]);

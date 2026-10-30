@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.13)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.14)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -206,7 +206,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.13',
+  build: '0.15.14',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -459,6 +459,19 @@ const CONFIG = {
       card: { dy: 0, r: 16, line: 0 }, reward: { dy: 0, r: 18, line: 0 }, intro: { dy: 10, r: 48, line: 3 }, compact: { dy: 3, r: 13, line: 1 },
       select: { dy: 0, r: 20, line: 2 }, selectUnlock: { dy: 0, r: 13, line: 1 }, // level select: the bot (was a 32x38 box) + the unlock swatch
       titleBot: { dy: 0, r: 20, line: 2 }, titleWallet: { dy: 0, x: 330, y: 438, r: 28, line: 2, label: [366, 438], labelSize: 11 } },
+  },
+  // v0.15.14 (Phill 12:37 AM: "make the boys look like they are waking or running"): code-driven walk / run on the painted bots.
+  // Display only (b.x / hits untouched). Phase = px walked / stride; the painted walk frames follow it too (syncAnim). Eases out
+  // (ease s) on bite / hit / rooted. bob px, squash / stretch share, tilt / lean rad (- = forward), rumble px at rumbleHz,
+  // treads: tick marks scrolling on the Tank's bottom track (local px from its centre). dumped = Pump Bot after the dump.
+  botMotion: {
+    on: true, syncAnim: true, ease: 0.15, shadowPerPx: 0.03,
+    rugBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03 },
+    firewallBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03 },
+    pumpBot: { on: true, stride: 28, steps: 2, bob: 5, squash: 0.08, stretch: 0.05, tilt: 0.05, lean: -0.14,
+               dumped: { stride: 14, steps: 2, bob: 1.5, squash: 0.04, stretch: 0, tilt: 0.08, lean: 0.04 } },
+    tankBot: { on: true, stride: 40, steps: 1, bob: 1, squash: 0.015, stretch: 0, tilt: 0, lean: 0, rumble: 0.6, rumbleHz: 11,
+               treads: { x: [4, 32], y: 20, gap: 6, w: 2, h: 2, color: 0x9a8a78, alpha: 0.6 } },
   },
   unlockDelay: 0,               // extra seconds before the reward card arc starts...
   unlockAfterSecured: true,     // ...counted from the END of the 1.5 s "SECURED" beat (false: from lane clear)
@@ -2682,10 +2695,11 @@ class Level extends Phaser.Scene {
     const trail = [0, 1, 2].map(i => W(this.add.rectangle(0, y - 18 + i * 18, 14 + i * 4, 3, 0xffffff, 0.6).setDepth(3).setVisible(false)));
     const rp = this.rvUnit(type, L.spawnX + offset, y, true, 'walk'); // v0.15.12 painted bot (null -> grey box)
     if (rp) { W(rp.shadow); W(rp.spr); }
+    const BM = CONFIG.botMotion, bm = BM[type]; if (rp && BM.on && bm && bm.on && bm.treads) rp.tr = W(this.add.graphics().setDepth(CONFIG.rosterArt.depth.bot + 0.01)); // v0.15.14
     const body = rp ? null : W(this.add.rectangle(0, y, e.width, e.height || 60, e.color).setStrokeStyle(2, 0x000000).setDepth(3));
     const label = rp ? null : W(this.add.text(0, y + 12, e.label || 'RUG', { fontSize: '12px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(3));
     const eyes = rp ? null : W(this.add.text(0, y - 12, '● ●', { fontSize: '12px', color: '#fff' }).setOrigin(0.5).setDepth(3));
-    const b = { e, lane, x: L.spawnX + offset, hp: e.hp, shield: e.shield || 0, flash: 0, body, label, eyes, trail, rv: rp, damaged: false, speed: e.speed * CONFIG.botSpeedScale, spawnT: this.t }; // v0.14: x botSpeedScale (Nova v1.2) // v0.12: speed (Pump dump), spawnT (L4 guide)
+    const b = { e, type, lane, x: L.spawnX + offset, hp: e.hp, shield: e.shield || 0, flash: 0, body, label, eyes, trail, rv: rp, damaged: false, speed: e.speed * CONFIG.botSpeedScale, spawnT: this.t }; // v0.14: x botSpeedScale (Nova v1.2) // v0.12: speed (Pump dump), spawnT (L4 guide)
     if (b.shield) { // Firewall: a shield outline + bar that drain first, then drop when broken
       const RA = CONFIG.rosterArt; // v0.15.12: painted shield = a 2nd sprite playing shield_<anim> (bar kept)
       if (rp && RVM().units[rp.p].anims.shield_walk) rp.sh = W(this.add.sprite(b.x, y, rp.p + '_atlas').setScale(RA.scale).setAlpha(RA.shieldAlpha).setDepth(RA.depth.shield));
@@ -2733,7 +2747,7 @@ class Level extends Phaser.Scene {
     if (b.dead) return;
     b.dead = true; this.lastDeath = { x: b.x, lane: b.lane }; sfx('botDeath');
     if (this.prog.aliveAtLast !== null) this.prog.kills++;
-    if (b.rv) { [b.rv.spr, b.rv.shadow, b.rv.sh].forEach(o => o && o.destroy()); this.rvDeath(b.rv.p, b.x, b.lane, true); } // v0.15.12: death fx, no confetti
+    if (b.rv) { [b.rv.spr, b.rv.shadow, b.rv.sh, b.rv.tr].forEach(o => o && o.destroy()); this.rvDeath(b.rv.p, b.x, b.lane, true); } // v0.15.12: death fx, no confetti
     else for (let i = 0; i < 10; i++) { // confetti burst
       const sq = WL(this.add.rectangle(b.x, laneY(b.lane), 6, 6, Phaser.Display.Color.RandomRGB().color).setDepth(4), b.lane);
       this.tweens.add({ targets: sq, x: b.x + rand(-50, 50), y: laneY(b.lane) + rand(-50, 50), alpha: 0, angle: 180, duration: 500, onComplete: () => sq.destroy() });
@@ -2980,9 +2994,22 @@ class Level extends Phaser.Scene {
     const a = bit ? 'bite' : t < r.hitUntil ? 'hit' : b.rootedUntil > t ? 'idle' : 'walk', dump = b.damaged && !!A['dump_' + a], st = dump ? 'dump_' + a : a;
     if (st !== r.st) { r.st = st; r.t0 = t; }
     for (const o of [r.spr, r.shadow, r.sh]) if (o) o.x = b.x;
-    rvSet(r.spr, r.p, st, t - r.t0);
-    if (r.sh) rvSet(r.sh, r.p, 'shield_' + a, t - r.t0);
+    const el = this.rvMotion(b, r, st) ?? t - r.t0; // v0.15.14
+    rvSet(r.spr, r.p, st, el);
+    if (r.sh) rvSet(r.sh, r.p, 'shield_' + a, el);
     for (const o of [r.spr, r.sh]) if (o) { if (b.flash > 0) o.setTintFill(R.hitTint); else if (b.damaged && !dump && b.e.dumpSpeed === undefined) o.setTint(R.tint); else o.clearTint(); }
+  }
+  rvMotion(b, r, st) { // v0.15.14 CONFIG.botMotion; returns the synced walk time (or undefined)
+    const M = CONFIG.botMotion, P = M.on && M[b.type], t = this.t, dt = clamp(t - (r.mT ?? t), 0, 0.1); r.mT = t;
+    if (!P || !P.on) return;
+    const Q = b.damaged && P.dumped || P, R = CONFIG.rosterArt, sc = R.scale, w = /walk$/.test(st), dx = (r.mX ?? b.x) - b.x, go = w && dx > 0; r.mX = b.x;
+    if (go) r.mD = (r.mD || 0) + dx;
+    const e = r.mE = clamp((r.mE || 0) + (go ? dt : -dt) / M.ease, 0, 1), ph = (r.mD || 0) / Q.stride, v = Math.sin(Math.PI * ph * Q.steps), s = Math.abs(v);
+    const sy = 1 + (Q.stretch * s - Q.squash * (1 - s) * (1 - s)) * e, y = laneY(b.lane) + R.feetY * (1 - sy) - (Q.bob * s - (Q.rumble || 0) * Math.sin(t * Q.rumbleHz * 6.283)) * e;
+    for (const o of [r.spr, r.sh]) if (o) o.setPosition(b.x, y).setScale(sc * (2 - sy), sc * sy).setRotation((Q.lean + Q.tilt * v) * e);
+    r.shadow.scaleX = R.shadow[r.p] * sc * (1 - M.shadowPerPx * Q.bob * s * e);
+    const T = Q.treads; if (r.tr && T) { r.tr.clear().fillStyle(T.color, T.alpha).setPosition(b.x, y); for (let x = T.x[0] + (r.mD || 0) % T.gap; x < T.x[1]; x += T.gap) r.tr.fillRect(x, T.y, T.w, T.h); }
+    return w && M.syncAnim ? ph * rvLen(r.p, st) : undefined;
   }
   rvDeath(p, x, lane, bot) { const R = CONFIG.rosterArt; this.rvFxAt({ p, a: 'death', x, y: laneY(lane), lane, depth: bot ? R.depth.bot : R.depth.def, sh: R.shadow[p] }); }
   rvFxAt(o) { // a one-shot fx sprite (death / blast / shield_break) + optional shadow (gone from the first shared poof frame)

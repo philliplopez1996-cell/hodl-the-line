@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.9)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.10)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -190,7 +190,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.9',
+  build: '0.15.10',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -377,6 +377,18 @@ const CONFIG = {
     biteHold: 0.05,         // s: a bite within this long counts as "being bitten" (bites tick every logic step)
     deathShadowOff: 3,      // death frame from which the shadow is gone (frames 3-5 = smoke)
     depth: { shadow: -1, body: 0, shot: 2 }, // laneDepth(lane, n)
+    // v0.15.10 pfp (Phill: "the pfp of the character ... instead of the old one"): head crop of mb_<sheet> frame <frame>, cut at run time
+    // as frame <name> of that texture. crop = [x, y, w, h] in 1x texture px inside the frame (art cols 16-31, rows 7-22; 1 art px = 2 px).
+    // size = on-screen game px of the art square (32 = 1 texture px per game px, 96 = 3); the border sits outside it.
+    // Missing mb_<sheet> (or on: false) -> the old grey circle in every place.
+    pfp: {
+      on: true, sheet: 'idle', frame: 0, name: 'pfp', crop: [32, 14, 32, 32], bg: 0x111320, border: 0x2ec4b6, borderW: 2,
+      card: { dy: 0, size: 32 },            // card bar: where the r16 circle was (0, -10)
+      reward: { dy: 0, size: 32 },          // NEW! reward card / airdrop card: where the r18 circle was (0, -12)
+      intro: { y: 10, size: 96 },           // full intro card portrait (introArt): where the r48 circle was
+      compact: { size: 32 },                // tips-off pill, top right (showCompact): the intro art shown at this size
+      title: { x: 244, y: 356, size: 96, label: [244, 418], labelSize: 11 }, // title screen: the r44 circle was at (250, 370); clears Cold Wallet (top 410)
+    },
   },
   unlockDelay: 0,               // extra seconds before the reward card arc starts...
   unlockAfterSecured: true,     // ...counted from the END of the 1.5 s "SECURED" beat (false: from lane clear)
@@ -1332,7 +1344,7 @@ class Level extends Phaser.Scene {
     const charge = this.add.rectangle(-40, -40, 80, 0, 0x000000, 0.5).setOrigin(0); // recharge fill
     const R = CONFIG.ui.readable; // the 11 px name already fills the 80 px card, so only the cost label grows (Pixel R1)
     const costTxt = this.add.text(0, 30, d.cost, { fontSize: cssMin(13, R.cardCostMinCss) + 'px', color: '#ffe66d', fontStyle: 'bold' }).setOrigin(0.5);
-    box.add([bg, this.add.circle(0, -10, 16, d.color),
+    box.add([bg, this.unitIcon(d, 0, -10, 16, 'card'), // v0.15.10 pfp for Moon Blaster
       this.add.text(0, 14, d.name, { fontSize: '11px', color: '#fff' }).setOrigin(0.5), costTxt, shade, charge]);
     return { key, d, holder, box, bg, shade, charge, costTxt, cooldown: 0, x, y, baseY: y, free: false };
   }
@@ -1965,9 +1977,15 @@ class Level extends Phaser.Scene {
       if (label === 'Skip' && op.skipPulse) this.tweens.add({ targets: c, scale: 1.12, yoyo: true, repeat: -1, duration: 400 });
     });
   }
+  unitIcon(d, x, y, r, where) { // v0.15.10: card / reward icon; Moon Blaster -> pfp (CONFIG.moonArt.pfp[where]), else (or no art) the circle
+    const P = CONFIG.moonArt.pfp, pf = d === CONFIG.defenders.blaster && P ? mbPfp(this, x, y + P[where].dy, P[where].size) : null;
+    return pf || this.add.circle(x, y, r, d.color);
+  }
   introArt(who, k = 1) { // grey-box portrait in the character's colour (Canvas card art goes here later)
     const c = this.add.container(0, 0), C = CONFIG.tutorial.cards[who];
-    if (who === 'blaster') c.add([this.add.circle(0, 10, 48 * k, C.color).setStrokeStyle(3, 0), this.add.triangle(0, -44 * k, 0, 30 * k, 18 * k, 0, 36 * k, 30 * k, 0xffffff), this.add.text(0, 10, 'MOON', { fontSize: 16 * k + 'px', color: '#000', fontStyle: 'bold' }).setOrigin(0.5)]);
+    const pf = who === 'blaster' ? mbPfp(this, 0, CONFIG.moonArt.pfp.intro.y * k, CONFIG.moonArt.pfp.intro.size * k) : null; // v0.15.10
+    if (pf) { c.add(pf); c._pfp = true; }
+    else if (who === 'blaster') c.add([this.add.circle(0, 10, 48 * k, C.color).setStrokeStyle(3, 0), this.add.triangle(0, -44 * k, 0, 30 * k, 18 * k, 0, 36 * k, 30 * k, 0xffffff), this.add.text(0, 10, 'MOON', { fontSize: 16 * k + 'px', color: '#000', fontStyle: 'bold' }).setOrigin(0.5)]);
     else if (who === 'rugBot') c.add([this.add.rectangle(0, 0, 90 * k, 110 * k, C.color).setStrokeStyle(3, 0), this.add.text(0, -22 * k, '● ●', { fontSize: 20 * k + 'px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 22 * k, 'RUG', { fontSize: 20 * k + 'px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5)]);
     else if (who === 'breaker') c.add(this.textures.exists('brk_idle') ? [this.add.image(0, 10 * k, 'brk_idle', 0).setScale(CONFIG.breakerArt.cardScale * k / ((window.HODL_ASSETS || {}).brkK || 1))] // v0.15.2 drone
       : [this.add.rectangle(0, 0, 100 * k, 90 * k, CONFIG.breakerSkin.body).setStrokeStyle(3, 0), this.add.circle(-28 * k, -24 * k, 6 * k, CONFIG.breakerSkin.led), this.add.text(0, 8 * k, CONFIG.breakerSkin.label, { fontSize: 22 * k + 'px', color: '#dddddd', fontStyle: 'bold' }).setOrigin(0.5)]);
@@ -2014,7 +2032,7 @@ class Level extends Phaser.Scene {
     this.tutMark(st.id, 'compact'); this.hideCompact();
     const box = this.add.container(Cc.x, Cc.y).setDepth(st.on === 'rewardCollected' ? 23 : 24), g = this.add.graphics();
     g.fillStyle(0x1b1e2e, 0.95).fillRoundedRect(0, 0, Cc.w, Cc.h, 12).lineStyle(2, C.color).strokeRoundedRect(0, 0, Cc.w, Cc.h, 12);
-    const icon = this.introArt(st.who); icon.setScale(40 / 150).setPosition(28, Cc.h / 2); this.hideTinyText(icon, 40 / 150); // v0.14
+    const icon = this.introArt(st.who); icon.setScale(icon._pfp ? CONFIG.moonArt.pfp.compact.size / CONFIG.moonArt.pfp.intro.size : 40 / 150).setPosition(28, Cc.h / 2); this.hideTinyText(icon, 40 / 150); // v0.14
     box.add([g, icon, this.add.text(54, 5, C.name, { fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff' }),
       this.add.text(54, 24, C.stats.slice(0, 2).join('\n'), { fontFamily: 'monospace', fontSize: '11px', color: '#b8b3ff' })]);
     const real = this.state !== 'playing';
@@ -2944,7 +2962,7 @@ class Level extends Phaser.Scene {
     const col = A.col === undefined ? CONFIG.tutorial.l2Guide.ringCol : clamp(Math.max(A.col, front + 1), 0, CONFIG.cols - 1);
     const k = Math.max(1, CONFIG.ui.minCardCssPx / (90 * VIEW.s)), sp = toScr(colX(col), laneY(lane)), x = sp.x, y = sp.y, y0 = -60 * k; // v0.13: lands on the projected tile
     const c = this.add.container(x, y0).setDepth(9).setScale(k);
-    c.add([this.add.rectangle(0, 0, 80, 90, 0x2a2f45).setStrokeStyle(3, 0xffe66d), this.add.circle(0, -12, 18, d.color),
+    c.add([this.add.rectangle(0, 0, 80, 90, 0x2a2f45).setStrokeStyle(3, 0xffe66d), this.unitIcon(d, 0, -12, 18, 'reward'),
       this.add.text(0, 18, d.name, { fontSize: '11px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 34, TX.airdropTag, { fontSize: '11px', color: '#ffe66d' }).setOrigin(0.5)]);
     this.airdrop = { c, x, y, y0, k, lane, fall: 0, landed: false, collected: false };
     this.log({ airdropDrop: true, lane });
@@ -2994,7 +3012,7 @@ class Level extends Phaser.Scene {
     const yw = laneY(spot.lane), s0 = toScr(spot.x, yw), s1 = toScr(clamp(spot.x, L.gridLeft + 45, GRID_RIGHT - 45), yw); // v0.13: projected
     const x0 = clamp(s0.x, 45, CONFIG.width - 45), x = s1.x, y = s1.y;
     const card = this.add.container(x0, y).setDepth(9);
-    card.add([this.add.rectangle(0, 0, 80, 90, 0x2a2f45).setStrokeStyle(3, 0xffe66d), this.add.circle(0, -12, 18, d.color),
+    card.add([this.add.rectangle(0, 0, 80, 90, 0x2a2f45).setStrokeStyle(3, 0xffe66d), this.unitIcon(d, 0, -12, 18, 'reward'),
       this.add.text(0, 18, d.name, { fontSize: '11px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 34, 'NEW!', { fontSize: '11px', color: '#ffe66d' }).setOrigin(0.5)]);
     this.unlockCard = card; card.k = Math.max(1, CONFIG.ui.minCardCssPx / (90 * VIEW.s));
     this.log({ unlockDrop: true, x: Math.round(x), deathX: Math.round(spot.x) });
@@ -3183,6 +3201,23 @@ const isTouchMode = () => window.__lastTouch ?? coarse();
 const noteInput = p => { const pt = p.event && p.event.pointerType; window.__lastTouch = !!(p.wasTouch || pt === 'touch' || pt === 'pen'); };
 const lighten = c => Phaser.Display.Color.ValueToColor(c).lighten(10).color;
 const txt = (s, x, y, str, size, color = '#fff', o = {}) => s.add.text(x, y, str, { fontFamily: 'sans-serif', fontSize: size + 'px', color, fontStyle: o.bold === false ? 'normal' : 'bold', align: 'center', ...o.style }).setOrigin(o.ox ?? 0.5, o.oy ?? 0.5);
+// v0.15.10: Moon Blaster pfp (CONFIG.moonArt.pfp) = head crop of the ninja's idle frame, NEAREST, in a dark square with a teal border.
+// Returns a container at (x, y) or null when the art is missing (callers then draw the old grey circle).
+function mbPfp(s, x, y, size) {
+  const M = CONFIG.moonArt, P = M && M.pfp, key = P && 'mb_' + P.sheet;
+  if (!M || !M.on || !P || !P.on || !s.textures.exists(key)) return null;
+  const tex = s.textures.get(key);
+  if (!tex.has(P.name)) {
+    const f = tex.get(P.frame), [cx, cy, w, h] = P.crop;
+    if (!f || cx + w > f.cutWidth || cy + h > f.cutHeight) return null;
+    tex.add(P.name, f.sourceIndex, f.cutX + cx, f.cutY + cy, w, h);
+    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+  const c = s.add.container(x, y);
+  c.add([s.add.rectangle(0, 0, size + P.borderW, size + P.borderW, P.bg).setStrokeStyle(P.borderW, P.border),
+    s.add.image(0, 0, key, P.name).setScale(size / P.crop[2], size / P.crop[3])]);
+  c._pfp = true; return c;
+}
 function rrect(s, x, y, w, h, r, fill, stroke, alpha = 1) { // x, y = top-left
   const g = s.add.graphics(); g.fillStyle(fill, alpha).fillRoundedRect(x, y, w, h, r);
   if (stroke !== undefined) g.lineStyle(2, stroke).strokeRoundedRect(x, y, w, h, r);
@@ -3305,6 +3340,10 @@ function placeholderPanel(s, ui, layer, title, line, onBack) { // full-screen pa
 // --------------------------------------------------------------------- Loading screen
 class Loading extends Phaser.Scene {
   constructor() { super('Loading'); }
+  preload() { // v0.15.10: the pfp's sheet (mb_idle) for the title screen; a failed load just leaves the old grey circle
+    const A = window.HODL_ASSETS || {}, P = CONFIG.moonArt.pfp, key = 'mb_' + P.sheet, sz = CONFIG.moonArt.sheets[P.sheet];
+    if (A[key] && !this.textures.exists(key)) this.load.spritesheet(key, A[key], { frameWidth: sz[0], frameHeight: sz[1] });
+  }
   create() {
     window.FE_SCENE = this; this.busy = false; this.ready = false; this.attempt = 0; this.t0 = performance.now(); this.p = 0; this.lit = 0;
     wallFade(this, 'in', 150);
@@ -3333,7 +3372,9 @@ class Loading extends Phaser.Scene {
     // 3 Degen squad (left)
     this.add.rectangle(52, 330, 6, 140, 0x55597a); this.add.rectangle(52, 272, 30, 26, CONFIG.breakerSkin.body).setStrokeStyle(2, 0x000000); this.add.circle(44, 266, 3, CONFIG.breakerSkin.led); this.add.circle(60, 266, 3, CONFIG.breakerSkin.led); txt(this, 52, 228, 'Liquidation\nDrone', 11, '#ddd', { bold: false }); // v0.15.2
     this.add.circle(150, 330, 26, 0xf4a261).setStrokeStyle(2, 0x000000); this.add.rectangle(180, 318, 18, 6, 0x8a8fa8); txt(this, 150, 368, 'Gas Miner', 11, '#ddd', { bold: false });
-    this.add.circle(250, 370, 44, 0x2ec4b6).setStrokeStyle(3, 0x000000); this.add.triangle(306, 370, 0, 0, 24, 12, 0, 24, 0xffffff); txt(this, 250, 370, 'Moon\nBlaster', 13, '#000');
+    const TP = CONFIG.moonArt.pfp.title, tpf = mbPfp(this, TP.x, TP.y, TP.size); // v0.15.10 Phill's ninja pfp (null -> the old grey circle)
+    if (tpf) txt(this, TP.label[0], TP.label[1], 'Moon Blaster', TP.labelSize, '#ddd', { bold: false });
+    else { this.add.circle(250, 370, 44, 0x2ec4b6).setStrokeStyle(3, 0x000000); this.add.triangle(306, 370, 0, 0, 24, 12, 0, 24, 0xffffff); txt(this, 250, 370, 'Moon\nBlaster', 13, '#000'); }
     this.add.rectangle(330, 440, 90, 60, 0x8ecae6).setStrokeStyle(3, 0x000000); txt(this, 330, 440, 'Cold Wallet', 12, '#000');
     // 5 Block bar + label, 6 version line
     this.label = txt(this, 480, 466, '', 16, '#b8b3ff');

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.14)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.15)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -206,7 +206,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.14',
+  build: '0.15.15',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -464,12 +464,13 @@ const CONFIG = {
   // Display only (b.x / hits untouched). Phase = px walked / stride; the painted walk frames follow it too (syncAnim). Eases out
   // (ease s) on bite / hit / rooted. bob px, squash / stretch share, tilt / lean rad (- = forward), rumble px at rumbleHz,
   // treads: tick marks scrolling on the Tank's bottom track (local px from its centre). dumped = Pump Bot after the dump.
+  // v0.15.15: rumble px / rumbleHz must be numbers on every set (missing rumbleHz made the body y NaN = invisible bots)
   botMotion: {
     on: true, syncAnim: true, ease: 0.15, shadowPerPx: 0.03,
-    rugBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03 },
-    firewallBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03 },
-    pumpBot: { on: true, stride: 28, steps: 2, bob: 5, squash: 0.08, stretch: 0.05, tilt: 0.05, lean: -0.14,
-               dumped: { stride: 14, steps: 2, bob: 1.5, squash: 0.04, stretch: 0, tilt: 0.08, lean: 0.04 } },
+    rugBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03, rumble: 0, rumbleHz: 0 },
+    firewallBot: { on: true, stride: 20, steps: 2, bob: 2.5, squash: 0.06, stretch: 0.03, tilt: 0.06, lean: -0.03, rumble: 0, rumbleHz: 0 },
+    pumpBot: { on: true, stride: 28, steps: 2, bob: 5, squash: 0.08, stretch: 0.05, tilt: 0.05, lean: -0.14, rumble: 0, rumbleHz: 0,
+               dumped: { stride: 14, steps: 2, bob: 1.5, squash: 0.04, stretch: 0, tilt: 0.08, lean: 0.04, rumble: 0, rumbleHz: 0 } },
     tankBot: { on: true, stride: 40, steps: 1, bob: 1, squash: 0.015, stretch: 0, tilt: 0, lean: 0, rumble: 0.6, rumbleHz: 11,
                treads: { x: [4, 32], y: 20, gap: 6, w: 2, h: 2, color: 0x9a8a78, alpha: 0.6 } },
   },
@@ -1218,6 +1219,7 @@ function brkPose(age, S = CONFIG.breakerSkin, A = CONFIG.breakerArt) {
 const WL = (o, lane) => { if (o) { o._w = true; o.setDepth(laneDepth(lane, o.depth)); } return o; }; // v0.13: tag a world-space object (projected at render time)
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fin = (v, d) => Number.isFinite(v) ? v : d; // v0.15.15
 const coarse = () => matchMedia('(pointer: coarse)').matches;
 // Layout: fit the 960x540 game into the window; in a portrait window rotate it 90 deg clockwise so it reads
 // correctly with the phone turned counterclockwise (left). VIEW maps window <-> game coords for input.
@@ -3003,13 +3005,13 @@ class Level extends Phaser.Scene {
     const M = CONFIG.botMotion, P = M.on && M[b.type], t = this.t, dt = clamp(t - (r.mT ?? t), 0, 0.1); r.mT = t;
     if (!P || !P.on) return;
     const Q = b.damaged && P.dumped || P, R = CONFIG.rosterArt, sc = R.scale, w = /walk$/.test(st), dx = (r.mX ?? b.x) - b.x, go = w && dx > 0; r.mX = b.x;
-    if (go) r.mD = (r.mD || 0) + dx;
-    const e = r.mE = clamp((r.mE || 0) + (go ? dt : -dt) / M.ease, 0, 1), ph = (r.mD || 0) / Q.stride, v = Math.sin(Math.PI * ph * Q.steps), s = Math.abs(v);
-    const sy = 1 + (Q.stretch * s - Q.squash * (1 - s) * (1 - s)) * e, y = laneY(b.lane) + R.feetY * (1 - sy) - (Q.bob * s - (Q.rumble || 0) * Math.sin(t * Q.rumbleHz * 6.283)) * e;
-    for (const o of [r.spr, r.sh]) if (o) o.setPosition(b.x, y).setScale(sc * (2 - sy), sc * sy).setRotation((Q.lean + Q.tilt * v) * e);
-    r.shadow.scaleX = R.shadow[r.p] * sc * (1 - M.shadowPerPx * Q.bob * s * e);
+    if (go) r.mD = fin((r.mD || 0) + dx, 0);
+    const e = r.mE = clamp((r.mE || 0) + (go ? dt : -dt) / M.ease, 0, 1), ph = fin((r.mD || 0) / Q.stride, 0), v = Math.sin(Math.PI * ph * Q.steps), s = Math.abs(v);
+    const sy = fin(1 + (Q.stretch * s - Q.squash * (1 - s) * (1 - s)) * e, 1), y = fin(laneY(b.lane) + R.feetY * (1 - sy) - (Q.bob * s - (Q.rumble ? Q.rumble * Math.sin(t * Q.rumbleHz * 6.283) : 0)) * e, laneY(b.lane));
+    for (const o of [r.spr, r.sh]) if (o) o.setPosition(b.x, y).setScale(sc * (2 - sy), sc * sy).setRotation(fin((Q.lean + Q.tilt * v) * e, 0));
+    r.shadow.scaleX = fin(R.shadow[r.p] * sc * (1 - M.shadowPerPx * Q.bob * s * e), R.shadow[r.p] * sc);
     const T = Q.treads; if (r.tr && T) { r.tr.clear().fillStyle(T.color, T.alpha).setPosition(b.x, y); for (let x = T.x[0] + (r.mD || 0) % T.gap; x < T.x[1]; x += T.gap) r.tr.fillRect(x, T.y, T.w, T.h); }
-    return w && M.syncAnim ? ph * rvLen(r.p, st) : undefined;
+    return w && M.syncAnim ? fin(ph * rvLen(r.p, st), undefined) : undefined;
   }
   rvDeath(p, x, lane, bot) { const R = CONFIG.rosterArt; this.rvFxAt({ p, a: 'death', x, y: laneY(lane), lane, depth: bot ? R.depth.bot : R.depth.def, sh: R.shadow[p] }); }
   rvFxAt(o) { // a one-shot fx sprite (death / blast / shield_break) + optional shadow (gone from the first shared poof frame)

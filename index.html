@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.10)</title>
+<title>HODL: Degens vs Bots - Levels 1-10 grey box (v0.15.11)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
   html, body { margin: 0; height: 100%; background: #0d0f1a; overflow: hidden; overscroll-behavior: none; }
@@ -190,7 +190,7 @@ const CONFIG = {
       // v0.15.0 (Nova l6-l10 plan 3): a jump to L6-L10 shows the Wallet / Firewall / Flash / Honey / Pump intros first; L9 + L10 also the Tank
       ...[6, 7, 8, 9, 10].flatMap(level => ['L2.intro.wallet', 'L3.intro.firewall', 'L4.intro.flash', 'L5.intro.honey', 'L5.intro.pump', ...(level >= 9 ? ['L8.intro.tank'] : [])].map(id => ({ id, level })))],
   },
-  build: '0.15.10',
+  build: '0.15.11',
   width: 960, height: 540,
   tileSize: 80, lanes: 5, cols: 11,  // v0.13: 9 -> 11 columns (Genesis map), every level
   // World grid (logic only since v0.13; drawing goes through map.H): x = gridLeft + col * tileSize, y = gridTop + lane * tileSize.
@@ -377,17 +377,17 @@ const CONFIG = {
     biteHold: 0.05,         // s: a bite within this long counts as "being bitten" (bites tick every logic step)
     deathShadowOff: 3,      // death frame from which the shadow is gone (frames 3-5 = smoke)
     depth: { shadow: -1, body: 0, shot: 2 }, // laneDepth(lane, n)
-    // v0.15.10 pfp (Phill: "the pfp of the character ... instead of the old one"): head crop of mb_<sheet> frame <frame>, cut at run time
-    // as frame <name> of that texture. crop = [x, y, w, h] in 1x texture px inside the frame (art cols 16-31, rows 7-22; 1 art px = 2 px).
-    // size = on-screen game px of the art square (32 = 1 texture px per game px, 96 = 3); the border sits outside it.
-    // Missing mb_<sheet> (or on: false) -> the old grey circle in every place.
+    // v0.15.10 pfp (Phill: "the pfp of the character ... instead of the old one"), v0.15.11 round (Phill: "Make it round like the others"):
+    // a head crop of mb_<sheet> frame <frame>, centred on center (1x texture px inside the frame), drawn at a whole k texture px -> 1 px
+    // into a circle of radius r (so the window is 2r / k texture px wide), on the fill disc. line = outline width (0 = none), lineColor.
+    // r / line per place = what the other units' round icons use there. Missing mb_<sheet> (or on: false) -> the old grey circle.
     pfp: {
-      on: true, sheet: 'idle', frame: 0, name: 'pfp', crop: [32, 14, 32, 32], bg: 0x111320, border: 0x2ec4b6, borderW: 2,
-      card: { dy: 0, size: 32 },            // card bar: where the r16 circle was (0, -10)
-      reward: { dy: 0, size: 32 },          // NEW! reward card / airdrop card: where the r18 circle was (0, -12)
-      intro: { y: 10, size: 96 },           // full intro card portrait (introArt): where the r48 circle was
-      compact: { size: 32 },                // tips-off pill, top right (showCompact): the intro art shown at this size
-      title: { x: 244, y: 356, size: 96, label: [244, 418], labelSize: 11 }, // title screen: the r44 circle was at (250, 370); clears Cold Wallet (top 410)
+      on: true, sheet: 'idle', frame: 0, center: [48, 30], fill: 0x2ec4b6, lineColor: 0x000000,
+      card: { dy: 0, r: 16, k: 1, line: 0 },      // card bar: the r16 circle slot at (0, -10), no outline (like every card)
+      reward: { dy: 0, r: 18, k: 1, line: 0 },    // NEW! reward / airdrop card: the r18 slot at (0, -12), no outline
+      intro: { dy: 10, r: 48, k: 3, line: 3 },    // full intro card: r48 + 3 px black at (0, 10), like the old circle (Gas Miner r46 + 3)
+      compact: { dy: 3, r: 13, k: 1, line: 1 },   // tips-off pill: the others show their r48 art at 40/150 (r12.8, ~1 px outline)
+      title: { x: 244, y: 362, r: 44, k: 3, line: 3, label: [244, 418], labelSize: 11 }, // title: r44 + 3 px black (old size); name under it
     },
   },
   unlockDelay: 0,               // extra seconds before the reward card arc starts...
@@ -1978,12 +1978,12 @@ class Level extends Phaser.Scene {
     });
   }
   unitIcon(d, x, y, r, where) { // v0.15.10: card / reward icon; Moon Blaster -> pfp (CONFIG.moonArt.pfp[where]), else (or no art) the circle
-    const P = CONFIG.moonArt.pfp, pf = d === CONFIG.defenders.blaster && P ? mbPfp(this, x, y + P[where].dy, P[where].size) : null;
+    const P = CONFIG.moonArt.pfp, pf = d === CONFIG.defenders.blaster && P ? mbPfp(this, x, y, where) : null; // v0.15.11 round
     return pf || this.add.circle(x, y, r, d.color);
   }
   introArt(who, k = 1) { // grey-box portrait in the character's colour (Canvas card art goes here later)
     const c = this.add.container(0, 0), C = CONFIG.tutorial.cards[who];
-    const pf = who === 'blaster' ? mbPfp(this, 0, CONFIG.moonArt.pfp.intro.y * k, CONFIG.moonArt.pfp.intro.size * k) : null; // v0.15.10
+    const pf = who === 'blaster' ? mbPfp(this, 0, 0, 'intro') : null; if (pf && k !== 1) pf.setScale(k); // v0.15.10 pfp, v0.15.11 round
     if (pf) { c.add(pf); c._pfp = true; }
     else if (who === 'blaster') c.add([this.add.circle(0, 10, 48 * k, C.color).setStrokeStyle(3, 0), this.add.triangle(0, -44 * k, 0, 30 * k, 18 * k, 0, 36 * k, 30 * k, 0xffffff), this.add.text(0, 10, 'MOON', { fontSize: 16 * k + 'px', color: '#000', fontStyle: 'bold' }).setOrigin(0.5)]);
     else if (who === 'rugBot') c.add([this.add.rectangle(0, 0, 90 * k, 110 * k, C.color).setStrokeStyle(3, 0), this.add.text(0, -22 * k, '● ●', { fontSize: 20 * k + 'px', color: '#fff' }).setOrigin(0.5), this.add.text(0, 22 * k, 'RUG', { fontSize: 20 * k + 'px', color: '#fff', fontStyle: 'bold' }).setOrigin(0.5)]);
@@ -2032,7 +2032,7 @@ class Level extends Phaser.Scene {
     this.tutMark(st.id, 'compact'); this.hideCompact();
     const box = this.add.container(Cc.x, Cc.y).setDepth(st.on === 'rewardCollected' ? 23 : 24), g = this.add.graphics();
     g.fillStyle(0x1b1e2e, 0.95).fillRoundedRect(0, 0, Cc.w, Cc.h, 12).lineStyle(2, C.color).strokeRoundedRect(0, 0, Cc.w, Cc.h, 12);
-    const icon = this.introArt(st.who); icon.setScale(icon._pfp ? CONFIG.moonArt.pfp.compact.size / CONFIG.moonArt.pfp.intro.size : 40 / 150).setPosition(28, Cc.h / 2); this.hideTinyText(icon, 40 / 150); // v0.14
+    const pfc = st.who === 'blaster' ? mbPfp(this, 0, 0, 'compact') : null, icon = pfc || this.introArt(st.who); icon.setScale(pfc ? 1 : 40 / 150).setPosition(28, Cc.h / 2); this.hideTinyText(icon, 40 / 150); // v0.14
     box.add([g, icon, this.add.text(54, 5, C.name, { fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#fff' }),
       this.add.text(54, 24, C.stats.slice(0, 2).join('\n'), { fontFamily: 'monospace', fontSize: '11px', color: '#b8b3ff' })]);
     const real = this.state !== 'playing';
@@ -3201,22 +3201,29 @@ const isTouchMode = () => window.__lastTouch ?? coarse();
 const noteInput = p => { const pt = p.event && p.event.pointerType; window.__lastTouch = !!(p.wasTouch || pt === 'touch' || pt === 'pen'); };
 const lighten = c => Phaser.Display.Color.ValueToColor(c).lighten(10).color;
 const txt = (s, x, y, str, size, color = '#fff', o = {}) => s.add.text(x, y, str, { fontFamily: 'sans-serif', fontSize: size + 'px', color, fontStyle: o.bold === false ? 'normal' : 'bold', align: 'center', ...o.style }).setOrigin(o.ox ?? 0.5, o.oy ?? 0.5);
-// v0.15.10: Moon Blaster pfp (CONFIG.moonArt.pfp) = head crop of the ninja's idle frame, NEAREST, in a dark square with a teal border.
-// Returns a container at (x, y) or null when the art is missing (callers then draw the old grey circle).
-function mbPfp(s, x, y, size) {
-  const M = CONFIG.moonArt, P = M && M.pfp, key = P && 'mb_' + P.sheet;
-  if (!M || !M.on || !P || !P.on || !s.textures.exists(key)) return null;
-  const tex = s.textures.get(key);
-  if (!tex.has(P.name)) {
-    const f = tex.get(P.frame), [cx, cy, w, h] = P.crop;
-    if (!f || cx + w > f.cutWidth || cy + h > f.cutHeight) return null;
-    tex.add(P.name, f.sourceIndex, f.cutX + cx, f.cutY + cy, w, h);
-    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+// v0.15.10/v0.15.11: Moon Blaster pfp (CONFIG.moonArt.pfp[where]) = round head crop of the ninja's idle frame, sharp pixels.
+// The crop is drawn once per place into a canvas texture with smoothing off and cut to a circle (canvas clip, smooth edge);
+// the outline is a normal circle stroke like the other units' icons. Returns a container at (x, y), or null when the art is
+// missing (callers then draw the old grey circle).
+function mbPfp(s, x, y, where) {
+  const M = CONFIG.moonArt, P = M && M.pfp, Q = P && P[where], key = P && 'mb_' + P.sheet;
+  if (!M || !M.on || !P || !P.on || !Q || !s.textures.exists(key)) return null;
+  const D = Math.round(Q.r * 2), tk = 'mb_pfp_' + where + '_' + D + '_' + Q.k;
+  if (!s.textures.exists(tk)) {
+    const src = s.textures.get(key), f = src.get(P.frame), img = f && src.getSourceImage(f.sourceIndex);
+    if (!f || !img) return null;
+    const w = D / Q.k, sx = f.cutX + P.center[0] - w / 2, sy = f.cutY + P.center[1] - w / 2;
+    if (sx < f.cutX || sy < f.cutY || sx + w > f.cutX + f.cutWidth || sy + w > f.cutY + f.cutHeight) return null;
+    const ct = s.textures.createCanvas(tk, D, D); if (!ct) return null;
+    const g = ct.getContext(); g.imageSmoothingEnabled = false;
+    g.save(); g.beginPath(); g.arc(D / 2, D / 2, D / 2, 0, Math.PI * 2); g.closePath(); g.clip();
+    g.fillStyle = '#' + P.fill.toString(16).padStart(6, '0'); g.fillRect(0, 0, D, D);
+    g.drawImage(img, sx, sy, w, w, 0, 0, D, D); g.restore();
+    ct.refresh(); ct.setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
-  const c = s.add.container(x, y);
-  c.add([s.add.rectangle(0, 0, size + P.borderW, size + P.borderW, P.bg).setStrokeStyle(P.borderW, P.border),
-    s.add.image(0, 0, key, P.name).setScale(size / P.crop[2], size / P.crop[3])]);
-  c._pfp = true; return c;
+  const c = s.add.container(x, y), dy = Q.dy || 0, parts = [s.add.image(0, dy, tk).setScale(Q.r * 2 / D)];
+  if (Q.line) parts.push(s.add.circle(0, dy, Q.r).setStrokeStyle(Q.line, P.lineColor));
+  c.add(parts); c._pfp = true; return c;
 }
 function rrect(s, x, y, w, h, r, fill, stroke, alpha = 1) { // x, y = top-left
   const g = s.add.graphics(); g.fillStyle(fill, alpha).fillRoundedRect(x, y, w, h, r);
@@ -3372,7 +3379,7 @@ class Loading extends Phaser.Scene {
     // 3 Degen squad (left)
     this.add.rectangle(52, 330, 6, 140, 0x55597a); this.add.rectangle(52, 272, 30, 26, CONFIG.breakerSkin.body).setStrokeStyle(2, 0x000000); this.add.circle(44, 266, 3, CONFIG.breakerSkin.led); this.add.circle(60, 266, 3, CONFIG.breakerSkin.led); txt(this, 52, 228, 'Liquidation\nDrone', 11, '#ddd', { bold: false }); // v0.15.2
     this.add.circle(150, 330, 26, 0xf4a261).setStrokeStyle(2, 0x000000); this.add.rectangle(180, 318, 18, 6, 0x8a8fa8); txt(this, 150, 368, 'Gas Miner', 11, '#ddd', { bold: false });
-    const TP = CONFIG.moonArt.pfp.title, tpf = mbPfp(this, TP.x, TP.y, TP.size); // v0.15.10 Phill's ninja pfp (null -> the old grey circle)
+    const TP = CONFIG.moonArt.pfp.title, tpf = mbPfp(this, TP.x, TP.y, 'title'); // v0.15.10 Phill's ninja pfp (null -> the old grey circle)
     if (tpf) txt(this, TP.label[0], TP.label[1], 'Moon Blaster', TP.labelSize, '#ddd', { bold: false });
     else { this.add.circle(250, 370, 44, 0x2ec4b6).setStrokeStyle(3, 0x000000); this.add.triangle(306, 370, 0, 0, 24, 12, 0, 24, 0xffffff); txt(this, 250, 370, 'Moon\nBlaster', 13, '#000'); }
     this.add.rectangle(330, 440, 90, 60, 0x8ecae6).setStrokeStyle(3, 0x000000); txt(this, 330, 440, 'Cold Wallet', 12, '#000');
